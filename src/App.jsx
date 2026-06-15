@@ -18,24 +18,44 @@ import {
   ChevronRight,
   TrendingDown
 } from 'lucide-react';
+import {
+  auth,
+  googleProvider,
+  appleProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+  signOut,
+  onAuthStateChanged,
+  signInWithPopup
+} from './firebase';
 
 export default function App() {
   // Navigation tab within app
   const [activeTab, setActiveTab] = useState('summary');
 
-  // Core Fitness State (Saved in LocalStorage)
-  const [steps, setSteps] = useState(() => {
-    const saved = localStorage.getItem('fit_steps');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [stairsUp, setStairsUp] = useState(() => {
-    const saved = localStorage.getItem('fit_stairs_up');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  const [stairsDown, setStairsDown] = useState(() => {
-    const saved = localStorage.getItem('fit_stairs_down');
-    return saved ? parseInt(saved, 10) : 0;
-  });
+  // Helper to read initial metric values from localstorage based on logged-in user or guest
+  const getSavedMetric = (baseKey, defaultValue) => {
+    const savedUserStr = localStorage.getItem('fit_user');
+    let keyPrefix = 'guest';
+    if (savedUserStr) {
+      try {
+        const parsed = JSON.parse(savedUserStr);
+        if (parsed && parsed.isLoggedIn && parsed.email) {
+          keyPrefix = parsed.email;
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    const savedValue = localStorage.getItem(`fit_${keyPrefix}_${baseKey}`);
+    return savedValue !== null ? savedValue : defaultValue;
+  };
+
+  // Core Fitness State (Saved in LocalStorage, scoped by user)
+  const [steps, setSteps] = useState(() => parseInt(getSavedMetric('steps', '0'), 10));
+  const [stairsUp, setStairsUp] = useState(() => parseInt(getSavedMetric('stairs_up', '0'), 10));
+  const [stairsDown, setStairsDown] = useState(() => parseInt(getSavedMetric('stairs_down', '0'), 10));
   
   // Custom Fitness Goals
   const [goals, setGoals] = useState({
@@ -45,42 +65,21 @@ export default function App() {
   });
 
   // Derived state
-  // Move Calories: Steps + Stairs Up + Stairs Down + Workouts
-  // 1 step = 0.04 kcal
-  // 1 stair up = 0.15 kcal
-  // 1 stair down = 0.05 kcal
-  const [workoutCalories, setWorkoutCalories] = useState(() => {
-    const saved = localStorage.getItem('fit_workout_calories');
-    return saved ? parseInt(saved, 10) : 0;
-  });
-  
+  const [workoutCalories, setWorkoutCalories] = useState(() => parseInt(getSavedMetric('workout_calories', '0'), 10));
   const moveCalories = Math.round((steps * 0.04) + (stairsUp * 0.15) + (stairsDown * 0.05) + workoutCalories);
 
   // Exercise Minutes: Workouts duration + Steps contribution (1 min per 100 fast steps, simulated)
-  const [workoutMinutes, setWorkoutMinutes] = useState(() => {
-    const saved = localStorage.getItem('fit_workout_minutes');
-    return saved ? parseInt(saved, 10) : 0;
-  });
+  const [workoutMinutes, setWorkoutMinutes] = useState(() => parseInt(getSavedMetric('workout_minutes', '0'), 10));
   const exerciseMinutes = Math.round(workoutMinutes + (steps * 0.002)); // base exercise contribution from walking
 
   // Stand Hours / Stair targets
   const standHours = Math.min(12, stairsUp + (steps > 0 ? Math.floor(steps / 1500) : 0));
 
-  // Workout History (Starts completely empty for a real tracker)
+  // Workout History (Scoped by user)
   const [workoutLogs, setWorkoutLogs] = useState(() => {
-    const saved = localStorage.getItem('fit_workout_logs');
-    return saved ? JSON.parse(saved) : [];
+    const saved = getSavedMetric('workout_logs', '[]');
+    return JSON.parse(saved);
   });
-
-  // Save to localStorage on state changes
-  useEffect(() => {
-    localStorage.setItem('fit_steps', steps);
-    localStorage.setItem('fit_stairs_up', stairsUp);
-    localStorage.setItem('fit_stairs_down', stairsDown);
-    localStorage.setItem('fit_workout_calories', workoutCalories);
-    localStorage.setItem('fit_workout_minutes', workoutMinutes);
-    localStorage.setItem('fit_workout_logs', JSON.stringify(workoutLogs));
-  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, workoutLogs]);
 
   // Hourly steps distribution for visual chart (All starts at 0 for a real tracker)
   const [hourlySteps, setHourlySteps] = useState([
@@ -130,39 +129,213 @@ export default function App() {
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
   const [authName, setAuthName] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  const currentUserRef = useRef(user.email || 'guest');
+
+  // Listen to Firebase authentication state changes
+  useEffect(() => {
+    const isMockFirebase = import.meta.env.VITE_FIREBASE_API_KEY === 'AIzaSyPlaceholderKeyForViteDevBuild' || !import.meta.env.VITE_FIREBASE_API_KEY;
+    if (isMockFirebase) return;
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+          email: firebaseUser.email,
+          isLoggedIn: true
+        });
+      } else {
+        setUser({
+          name: '',
+          email: '',
+          isLoggedIn: false
+        });
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Load user-specific stats when logged-in user changes
+  useEffect(() => {
+    const keyPrefix = user.isLoggedIn && user.email ? user.email : 'guest';
+    currentUserRef.current = keyPrefix; // update ref BEFORE setting state to prevent saving old values to new keys!
+    
+    const savedSteps = localStorage.getItem(`fit_${keyPrefix}_steps`);
+    setSteps(savedSteps ? parseInt(savedSteps, 10) : 0);
+    
+    const savedStairsUp = localStorage.getItem(`fit_${keyPrefix}_stairs_up`);
+    setStairsUp(savedStairsUp ? parseInt(savedStairsUp, 10) : 0);
+    
+    const savedStairsDown = localStorage.getItem(`fit_${keyPrefix}_stairs_down`);
+    setStairsDown(savedStairsDown ? parseInt(savedStairsDown, 10) : 0);
+    
+    const savedCal = localStorage.getItem(`fit_${keyPrefix}_workout_calories`);
+    setWorkoutCalories(savedCal ? parseInt(savedCal, 10) : 0);
+    
+    const savedMin = localStorage.getItem(`fit_${keyPrefix}_workout_minutes`);
+    setWorkoutMinutes(savedMin ? parseInt(savedMin, 10) : 0);
+    
+    const savedLogs = localStorage.getItem(`fit_${keyPrefix}_workout_logs`);
+    setWorkoutLogs(savedLogs ? JSON.parse(savedLogs) : []);
+  }, [user.email, user.isLoggedIn]);
+
+  // Save user-scoped metrics on state changes
+  useEffect(() => {
+    const keyPrefix = user.isLoggedIn && user.email ? user.email : 'guest';
+    // Only save if the ref matches the current keyPrefix (meaning we are not mid-load)
+    if (currentUserRef.current === keyPrefix) {
+      localStorage.setItem(`fit_${keyPrefix}_steps`, steps);
+      localStorage.setItem(`fit_${keyPrefix}_stairs_up`, stairsUp);
+      localStorage.setItem(`fit_${keyPrefix}_stairs_down`, stairsDown);
+      localStorage.setItem(`fit_${keyPrefix}_workout_calories`, workoutCalories);
+      localStorage.setItem(`fit_${keyPrefix}_workout_minutes`, workoutMinutes);
+      localStorage.setItem(`fit_${keyPrefix}_workout_logs`, JSON.stringify(workoutLogs));
+    }
+  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, workoutLogs, user]);
 
   useEffect(() => {
     localStorage.setItem('fit_user', JSON.stringify(user));
   }, [user]);
 
-  const handleAuthSubmit = (e) => {
+  const handleAuthSubmit = async (e) => {
     e.preventDefault();
-    if (authMode === 'login') {
+    setAuthError('');
+    
+    // Check if running in mock/offline mode (using fallback/placeholder keys)
+    const isMockFirebase = import.meta.env.VITE_FIREBASE_API_KEY === 'AIzaSyPlaceholderKeyForViteDevBuild' || !import.meta.env.VITE_FIREBASE_API_KEY;
+    
+    if (isMockFirebase) {
       setUser({
-        name: authName || 'John Doe',
+        name: authMode === 'login' ? (authName || authEmail.split('@')[0]) : (authName || 'New User'),
         email: authEmail,
         isLoggedIn: true
       });
-    } else {
-      setUser({
-        name: authName || 'New User',
-        email: authEmail,
-        isLoggedIn: true
-      });
+      setShowProfileModal(false);
+      setAuthEmail('');
+      setAuthPassword('');
+      setAuthName('');
+      return;
     }
-    setShowProfileModal(false);
-    setAuthEmail('');
-    setAuthPassword('');
-    setAuthName('');
+
+    try {
+      if (authMode === 'login') {
+        await signInWithEmailAndPassword(auth, authEmail, authPassword);
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, authEmail, authPassword);
+        await updateProfile(userCredential.user, {
+          displayName: authName || authEmail.split('@')[0]
+        });
+        // Set user details locally so they update immediately
+        setUser({
+          name: authName || authEmail.split('@')[0],
+          email: authEmail,
+          isLoggedIn: true
+        });
+      }
+      setShowProfileModal(false);
+      setAuthEmail('');
+      setAuthPassword('');
+      setAuthName('');
+    } catch (err) {
+      console.error(err);
+      let msg = err.message;
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        msg = 'Invalid email or password.';
+      } else if (err.code === 'auth/email-already-in-use') {
+        msg = 'This email is already registered.';
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'Password should be at least 6 characters.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'Please enter a valid email address.';
+      } else if (err.code === 'auth/invalid-api-key') {
+        console.warn('Invalid Firebase API Key. Falling back to offline mock mode.');
+        setUser({
+          name: authMode === 'login' ? (authName || authEmail.split('@')[0]) : (authName || 'New User'),
+          email: authEmail,
+          isLoggedIn: true
+        });
+        setShowProfileModal(false);
+        setAuthEmail('');
+        setAuthPassword('');
+        setAuthName('');
+        return;
+      }
+      setAuthError(msg);
+    }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    const isMockFirebase = import.meta.env.VITE_FIREBASE_API_KEY === 'AIzaSyPlaceholderKeyForViteDevBuild' || !import.meta.env.VITE_FIREBASE_API_KEY;
+    if (!isMockFirebase) {
+      try {
+        await signOut(auth);
+      } catch (err) {
+        console.error("Sign out error:", err);
+      }
+    }
     setUser({
       name: '',
       email: '',
       isLoggedIn: false
     });
     setShowProfileModal(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setAuthError('');
+    const isMockFirebase = import.meta.env.VITE_FIREBASE_API_KEY === 'AIzaSyPlaceholderKeyForViteDevBuild' || !import.meta.env.VITE_FIREBASE_API_KEY;
+    if (isMockFirebase) {
+      setUser({ name: 'Google User', email: 'google.account@gmail.com', isLoggedIn: true });
+      setShowProfileModal(false);
+      return;
+    }
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      setUser({
+        name: user.displayName || 'Google User',
+        email: user.email,
+        isLoggedIn: true
+      });
+      setShowProfileModal(false);
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'auth/invalid-api-key') {
+        setUser({ name: 'Google User', email: 'google.account@gmail.com', isLoggedIn: true });
+        setShowProfileModal(false);
+      } else {
+        setAuthError(err.message);
+      }
+    }
+  };
+
+  const handleAppleSignIn = async () => {
+    setAuthError('');
+    const isMockFirebase = import.meta.env.VITE_FIREBASE_API_KEY === 'AIzaSyPlaceholderKeyForViteDevBuild' || !import.meta.env.VITE_FIREBASE_API_KEY;
+    if (isMockFirebase) {
+      setUser({ name: 'Apple User', email: 'apple.id@icloud.com', isLoggedIn: true });
+      setShowProfileModal(false);
+      return;
+    }
+    try {
+      const result = await signInWithPopup(auth, appleProvider);
+      const user = result.user;
+      setUser({
+        name: user.displayName || 'Apple User',
+        email: user.email,
+        isLoggedIn: true
+      });
+      setShowProfileModal(false);
+    } catch (err) {
+      console.error(err);
+      if (err.code === 'auth/invalid-api-key') {
+        setUser({ name: 'Apple User', email: 'apple.id@icloud.com', isLoggedIn: true });
+        setShowProfileModal(false);
+      } else {
+        setAuthError(err.message);
+      }
+    }
   };
 
   const getInitials = (name) => {
@@ -929,7 +1102,10 @@ export default function App() {
                     {user.isLoggedIn ? `Hi, ${user.name.split(' ')[0]}` : 'Welcome Guest'}
                   </div>
                 </div>
-                <div className="user-profile" onClick={() => setShowProfileModal(true)} style={{ cursor: 'pointer' }}>
+                <div className="user-profile" onClick={() => {
+                  setShowProfileModal(true);
+                  setAuthError('');
+                }} style={{ cursor: 'pointer' }}>
                   <div className="user-avatar">
                     {user.isLoggedIn ? getInitials(user.name) : <User size={20} />}
                   </div>
@@ -1509,6 +1685,23 @@ export default function App() {
                       <p className="auth-subtitle">Sync your Apple Fitness rings & logs to your account</p>
                     </div>
                     
+                    {authError && (
+                      <div style={{
+                        background: 'rgba(255, 69, 58, 0.12)',
+                        color: '#ff453a',
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        fontSize: '11px',
+                        marginBottom: '14px',
+                        textAlign: 'center',
+                        fontWeight: '500',
+                        border: '1px solid rgba(255, 69, 58, 0.25)',
+                        lineHeight: '1.4'
+                      }}>
+                        {authError}
+                      </div>
+                    )}
+
                     <form className="auth-form" onSubmit={handleAuthSubmit}>
                       {authMode === 'signup' && (
                         <div className="auth-field">
@@ -1555,23 +1748,29 @@ export default function App() {
 
                     <p className="auth-toggle-text">
                       {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
-                      <span className="auth-toggle-link" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
+                      <span className="auth-toggle-link" onClick={() => {
+                        setAuthMode(authMode === 'login' ? 'signup' : 'login');
+                        setAuthError('');
+                      }}>
                         {authMode === 'login' ? 'Sign Up' : 'Sign In'}
                       </span>
                     </p>
 
                     <div className="social-auth">
-                      <button className="social-btn social-btn-apple" onClick={() => {
-                        setUser({ name: 'Apple User', email: 'apple.id@icloud.com', isLoggedIn: true });
-                        setShowProfileModal(false);
-                      }}>
-                         Sign In with Apple
+                      <button className="social-btn social-btn-apple" onClick={handleAppleSignIn}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ marginRight: '8px' }}>
+                          <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.48C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.1 16.67C20.08 16.74 19.67 18.11 18.71 19.5M15.97 4.17C16.63 3.37 17.07 2.28 16.95 1C15.85 1.04 14.51 1.73 13.73 2.64C13.07 3.41 12.49 4.52 12.64 5.78C13.87 5.87 15.12 5.17 15.97 4.17Z" />
+                        </svg>
+                        {authMode === 'login' ? 'Sign In with Apple' : 'Sign Up with Apple'}
                       </button>
-                      <button className="social-btn" onClick={() => {
-                        setUser({ name: 'Google User', email: 'google.account@gmail.com', isLoggedIn: true });
-                        setShowProfileModal(false);
-                      }}>
-                        Sign In with Google
+                      <button className="social-btn" onClick={handleGoogleSignIn}>
+                        <svg viewBox="0 0 24 24" width="16" height="16" style={{ marginRight: '8px' }}>
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.77c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                        </svg>
+                        {authMode === 'login' ? 'Sign In with Google' : 'Sign Up with Google'}
                       </button>
                     </div>
                   </div>
