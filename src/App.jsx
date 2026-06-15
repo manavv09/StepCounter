@@ -1,0 +1,1585 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Flame, 
+  Activity, 
+  TrendingUp, 
+  Heart, 
+  Trophy, 
+  Timer, 
+  Calculator, 
+  History, 
+  Play, 
+  Pause, 
+  Square, 
+  User, 
+  Plus, 
+  Minus, 
+  Info,
+  ChevronRight,
+  TrendingDown
+} from 'lucide-react';
+
+export default function App() {
+  // Navigation tab within app
+  const [activeTab, setActiveTab] = useState('summary');
+
+  // Core Fitness State (Saved in LocalStorage)
+  const [steps, setSteps] = useState(() => {
+    const saved = localStorage.getItem('fit_steps');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [stairsUp, setStairsUp] = useState(() => {
+    const saved = localStorage.getItem('fit_stairs_up');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const [stairsDown, setStairsDown] = useState(() => {
+    const saved = localStorage.getItem('fit_stairs_down');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  
+  // Custom Fitness Goals
+  const [goals, setGoals] = useState({
+    move: 500,       // Calories (kcal)
+    exercise: 30,    // Minutes
+    stand: 12        // Stairs up / Stand points
+  });
+
+  // Derived state
+  // Move Calories: Steps + Stairs Up + Stairs Down + Workouts
+  // 1 step = 0.04 kcal
+  // 1 stair up = 0.15 kcal
+  // 1 stair down = 0.05 kcal
+  const [workoutCalories, setWorkoutCalories] = useState(() => {
+    const saved = localStorage.getItem('fit_workout_calories');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  
+  const moveCalories = Math.round((steps * 0.04) + (stairsUp * 0.15) + (stairsDown * 0.05) + workoutCalories);
+
+  // Exercise Minutes: Workouts duration + Steps contribution (1 min per 100 fast steps, simulated)
+  const [workoutMinutes, setWorkoutMinutes] = useState(() => {
+    const saved = localStorage.getItem('fit_workout_minutes');
+    return saved ? parseInt(saved, 10) : 0;
+  });
+  const exerciseMinutes = Math.round(workoutMinutes + (steps * 0.002)); // base exercise contribution from walking
+
+  // Stand Hours / Stair targets
+  const standHours = Math.min(12, stairsUp + (steps > 0 ? Math.floor(steps / 1500) : 0));
+
+  // Workout History (Starts completely empty for a real tracker)
+  const [workoutLogs, setWorkoutLogs] = useState(() => {
+    const saved = localStorage.getItem('fit_workout_logs');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Save to localStorage on state changes
+  useEffect(() => {
+    localStorage.setItem('fit_steps', steps);
+    localStorage.setItem('fit_stairs_up', stairsUp);
+    localStorage.setItem('fit_stairs_down', stairsDown);
+    localStorage.setItem('fit_workout_calories', workoutCalories);
+    localStorage.setItem('fit_workout_minutes', workoutMinutes);
+    localStorage.setItem('fit_workout_logs', JSON.stringify(workoutLogs));
+  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, workoutLogs]);
+
+  // Hourly steps distribution for visual chart (All starts at 0 for a real tracker)
+  const [hourlySteps, setHourlySteps] = useState([
+    { hour: '9a', count: 0 },
+    { hour: '10a', count: 0 },
+    { hour: '11a', count: 0 },
+    { hour: '12p', count: 0 },
+    { hour: '1p', count: 0 },
+    { hour: '2p', count: 0 },
+    { hour: '3p', count: 0 },
+    { hour: '4p', count: 0 },
+    { hour: '5p', count: 0 },
+  ]);
+
+  // Active workout session state
+  const [activeSession, setActiveSession] = useState(null); // { type, duration, calories, heartRate, intervalId }
+  const [isPaused, setIsPaused] = useState(false);
+  const sessionTimerRef = useRef(null);
+
+  // Auto Simulator (walking/running) state
+  const [autoSimActive, setAutoSimActive] = useState(false);
+  const [simSpeed, setSimSpeed] = useState(1); // 1 = Normal, 2 = Fast, 5 = Sprint
+  const autoSimIntervalRef = useRef(null);
+
+  // Mobile Device motion sensors state
+  const [sensorStatus, setSensorStatus] = useState('idle'); // idle, checking, active, error, denied
+
+  // BMI Calculator State
+  const [bmiInput, setBmiInput] = useState({ height: '', weight: '' });
+  const [bmiResult, setBmiResult] = useState(null);
+
+  // Pace Calculator State
+  const [paceInput, setPaceInput] = useState({ distance: '', time: '' });
+  const [paceResult, setPaceResult] = useState(null);
+
+  // Target Calorie Planner State
+  const [calorieInput, setCalorieInput] = useState({ goal: 'loss', weight: '', activity: '1.2' });
+  const [calorieResult, setCalorieResult] = useState(null);
+
+  // User Profile & Authentication States
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('fit_user');
+    return saved ? JSON.parse(saved) : { name: 'John Doe', email: 'john@example.com', isLoggedIn: true };
+  });
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // login, signup
+  const [authEmail, setAuthEmail] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authName, setAuthName] = useState('');
+
+  useEffect(() => {
+    localStorage.setItem('fit_user', JSON.stringify(user));
+  }, [user]);
+
+  const handleAuthSubmit = (e) => {
+    e.preventDefault();
+    if (authMode === 'login') {
+      setUser({
+        name: authName || 'John Doe',
+        email: authEmail,
+        isLoggedIn: true
+      });
+    } else {
+      setUser({
+        name: authName || 'New User',
+        email: authEmail,
+        isLoggedIn: true
+      });
+    }
+    setShowProfileModal(false);
+    setAuthEmail('');
+    setAuthPassword('');
+    setAuthName('');
+  };
+
+  const handleLogout = () => {
+    setUser({
+      name: '',
+      email: '',
+      isLoggedIn: false
+    });
+    setShowProfileModal(false);
+  };
+
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].substring(0, 2).toUpperCase();
+    return (parts[0][0] + (parts[parts.length - 1] ? parts[parts.length - 1][0] : '')).toUpperCase();
+  };
+
+  // Clean intervals on unmount
+  useEffect(() => {
+    return () => {
+      if (sessionTimerRef.current) clearInterval(sessionTimerRef.current);
+      if (autoSimIntervalRef.current) clearInterval(autoSimIntervalRef.current);
+    };
+  }, []);
+
+  // Update hourly charts dynamically when steps update
+  useEffect(() => {
+    // Add current steps to the latest active hours
+    const currentHourIndex = 6; // index for 3p
+    setHourlySteps(prev => {
+      const copy = [...prev];
+      // calculate simulated difference or current hour display
+      const totalPastHours = copy.slice(0, 6).reduce((acc, h) => acc + h.count, 0);
+      const remainingSteps = Math.max(0, steps - totalPastHours);
+      copy[6].count = Math.round(remainingSteps * 0.6);
+      copy[7].count = Math.round(remainingSteps * 0.4);
+      return copy;
+    });
+  }, [steps]);
+
+  // Start Auto Walk Simulator for active session steps
+  const toggleAutoSim = () => {
+    if (autoSimActive) {
+      clearInterval(autoSimIntervalRef.current);
+      setAutoSimActive(false);
+    } else {
+      setAutoSimActive(true);
+      autoSimIntervalRef.current = setInterval(() => {
+        setActiveSession(prev => {
+          if (!prev) return null;
+          const stepInc = 4;
+          const nextSteps = (prev.steps || 0) + stepInc;
+          const nextDistance = parseFloat((nextSteps * 0.00075).toFixed(3));
+          return {
+            ...prev,
+            steps: nextSteps,
+            distance: nextDistance
+          };
+        });
+      }, 500);
+    }
+  };
+
+  // Request & Connect Accelerometer for mobile pedometer simulation
+  const requestSensorPermission = async () => {
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        setSensorStatus('checking');
+        const permissionState = await DeviceMotionEvent.requestPermission();
+        if (permissionState === 'granted') {
+          startDeviceMotionListener();
+        } else {
+          setSensorStatus('denied');
+        }
+      } catch (err) {
+        console.error(err);
+        setSensorStatus('error');
+      }
+    } else if (typeof DeviceMotionEvent !== 'undefined') {
+      // Direct integration for browsers that don't need requestPermission
+      startDeviceMotionListener();
+    } else {
+      setSensorStatus('error');
+      alert('Accelerometer DeviceMotionEvent not supported on this browser/device.');
+    }
+  };
+
+  const startDeviceMotionListener = () => {
+    setSensorStatus('active');
+    let lastX = null, lastY = null, lastZ = null;
+    let threshold = 15; // shake acceleration threshold
+    let lastTime = Date.now();
+
+    const handleMotionEvent = (event) => {
+      const acc = event.accelerationIncludingGravity || event.acceleration;
+      if (!acc) return;
+      
+      let currTime = Date.now();
+      if ((currTime - lastTime) > 100) {
+        let diffTime = currTime - lastTime;
+        lastTime = currTime;
+
+        let x = acc.x;
+        let y = acc.y;
+        let z = acc.z;
+
+        if (lastX !== null) {
+          let speed = Math.abs(x + y + z - lastX - lastY - lastZ) / diffTime * 10000;
+          if (speed > threshold) {
+            // Motion shake detected! Let's update activeSession!
+            setActiveSession(prev => {
+              if (!prev) return null;
+              
+              let nextSteps = prev.steps || 0;
+              let nextDistance = prev.distance || 0;
+              let nextStairsUp = prev.stairsUp || 0;
+              let nextStrokes = prev.strokes || 0;
+              let nextSwings = prev.swings || 0;
+              
+              if (['Walking', 'Running'].includes(prev.type)) {
+                nextSteps += 1;
+                nextDistance = parseFloat((nextSteps * 0.00075).toFixed(3));
+              } else if (prev.type === 'Stair Climbing') {
+                nextSteps += 1;
+                if (Math.random() > 0.8) {
+                  nextStairsUp += 1;
+                }
+              } else if (prev.type === 'Swimming') {
+                nextStrokes += 1;
+              } else if (['Badminton', 'Tennis'].includes(prev.type)) {
+                nextSwings += 1;
+              }
+
+              return {
+                ...prev,
+                steps: nextSteps,
+                distance: nextDistance,
+                stairsUp: nextStairsUp,
+                strokes: nextStrokes,
+                swings: nextSwings
+              };
+            });
+          }
+        }
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+      }
+    };
+
+    window.addEventListener('devicemotion', handleMotionEvent);
+  };
+
+  // Workout sessions tracking
+  const workoutsList = [
+    { type: 'Running', icon: '🏃', color: 'linear-gradient(135deg, #ff1b55, #ff5e3a)', baseHeartRate: 140, calorieBurnRate: 11 }, // kcal/min
+    { type: 'Walking', icon: '🚶', color: 'linear-gradient(135deg, #b1f900, #00f968)', baseHeartRate: 105, calorieBurnRate: 5 },
+    { type: 'Stair Climbing', icon: '🪜', color: 'linear-gradient(135deg, #ffd60a, #ff9f0a)', baseHeartRate: 120, calorieBurnRate: 7 },
+    { type: 'Swimming', icon: '🏊', color: 'linear-gradient(135deg, #00d2ff, #0066ff)', baseHeartRate: 130, calorieBurnRate: 9 },
+    { type: 'Badminton', icon: '🏸', color: 'linear-gradient(135deg, #ff9f0a, #ffd60a)', baseHeartRate: 135, calorieBurnRate: 8 },
+    { type: 'Tennis', icon: '🎾', color: 'linear-gradient(135deg, #aa3bff, #ff0055)', baseHeartRate: 130, calorieBurnRate: 7.5 },
+    { type: 'Cycling', icon: '🚴', color: 'linear-gradient(135deg, #30d158, #00f968)', baseHeartRate: 125, calorieBurnRate: 8.5 },
+    { type: 'Yoga', icon: '🧘', color: 'linear-gradient(135deg, #bf5af2, #ff5e3a)', baseHeartRate: 95, calorieBurnRate: 3.5 },
+  ];
+
+  // Session-specific simulation triggers
+  const handleSessionAddSteps = (amount) => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      const nextSteps = (prev.steps || 0) + amount;
+      const nextDistance = parseFloat((nextSteps * 0.00075).toFixed(3));
+      return {
+        ...prev,
+        steps: nextSteps,
+        distance: nextDistance
+      };
+    });
+  };
+
+  const handleSessionAddStairsUp = () => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      const nextStairsUp = (prev.stairsUp || 0) + 1;
+      const nextSteps = (prev.steps || 0) + 15;
+      const nextDistance = parseFloat((nextSteps * 0.00075).toFixed(3));
+      return {
+        ...prev,
+        stairsUp: nextStairsUp,
+        steps: nextSteps,
+        distance: nextDistance
+      };
+    });
+  };
+
+  const handleSessionAddStairsDown = () => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      const nextStairsDown = (prev.stairsDown || 0) + 1;
+      const nextSteps = (prev.steps || 0) + 12;
+      const nextDistance = parseFloat((nextSteps * 0.00075).toFixed(3));
+      return {
+        ...prev,
+        stairsDown: nextStairsDown,
+        steps: nextSteps,
+        distance: nextDistance
+      };
+    });
+  };
+
+  const handleSessionAddStrokes = (amount) => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        strokes: (prev.strokes || 0) + amount
+      };
+    });
+  };
+
+  const handleSessionAddLap = () => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        laps: (prev.laps || 0) + 1,
+        strokes: (prev.strokes || 0) + 20
+      };
+    });
+  };
+
+  const handleSessionAddSwings = (amount) => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        swings: (prev.swings || 0) + amount
+      };
+    });
+  };
+
+  const handleSessionAddPedals = () => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        distance: parseFloat((prev.distance + 0.5).toFixed(2))
+      };
+    });
+  };
+
+  const handleSessionAddBreaths = () => {
+    setActiveSession(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        breaths: (prev.breaths || 0) + 1
+      };
+    });
+  };
+
+  const startWorkout = (workout) => {
+    setActiveTab('workouts');
+    setIsPaused(false);
+    setActiveSession({
+      type: workout.type,
+      icon: workout.icon,
+      duration: 0,
+      calories: 0,
+      heartRate: workout.baseHeartRate,
+      baseHeartRate: workout.baseHeartRate,
+      calorieBurnRate: workout.calorieBurnRate,
+      distance: 0,
+      steps: 0,
+      stairsUp: 0,
+      stairsDown: 0,
+      strokes: 0,
+      swings: 0,
+      laps: 0,
+      breaths: 0
+    });
+
+    sessionTimerRef.current = setInterval(() => {
+      setActiveSession(prev => {
+        if (!prev) return null;
+        const nextDuration = prev.duration + 1; // secs
+        
+        // Realistic fluctuating heart rate
+        const hrOffset = Math.sin(nextDuration / 5) * 5 + (Math.random() - 0.5) * 4;
+        const nextHR = Math.round(prev.baseHeartRate + hrOffset);
+
+        // Compute calories dynamically
+        // Baseline burn based on duration
+        const timeCalories = (nextDuration / 60) * prev.calorieBurnRate;
+        // Action burn based on steps/strokes/swings
+        const actionCalories = 
+          ((prev.steps || 0) * 0.04) + 
+          ((prev.stairsUp || 0) * 0.15) + 
+          ((prev.stairsDown || 0) * 0.05) +
+          ((prev.strokes || 0) * 0.12) + 
+          ((prev.swings || 0) * 0.10) +
+          (prev.type === 'Cycling' ? (prev.distance || 0) * 18 : 0) +
+          ((prev.breaths || 0) * 0.5);
+
+        const nextCalories = Math.round(timeCalories + actionCalories);
+
+        return {
+          ...prev,
+          duration: nextDuration,
+          heartRate: nextHR,
+          calories: nextCalories
+        };
+      });
+    }, 1000);
+  };
+
+  const pauseWorkout = () => {
+    clearInterval(sessionTimerRef.current);
+    setIsPaused(true);
+  };
+
+  const resumeWorkout = () => {
+    setIsPaused(false);
+    sessionTimerRef.current = setInterval(() => {
+      setActiveSession(prev => {
+        if (!prev) return null;
+        const nextDuration = prev.duration + 1; // secs
+        const hrOffset = Math.sin(nextDuration / 5) * 5 + (Math.random() - 0.5) * 4;
+        const nextHR = Math.round(prev.baseHeartRate + hrOffset);
+        
+        const timeCalories = (nextDuration / 60) * prev.calorieBurnRate;
+        const actionCalories = 
+          ((prev.steps || 0) * 0.04) + 
+          ((prev.stairsUp || 0) * 0.15) + 
+          ((prev.stairsDown || 0) * 0.05) +
+          ((prev.strokes || 0) * 0.12) + 
+          ((prev.swings || 0) * 0.10) +
+          (prev.type === 'Cycling' ? (prev.distance || 0) * 18 : 0) +
+          ((prev.breaths || 0) * 0.5);
+
+        const nextCalories = Math.round(timeCalories + actionCalories);
+
+        return {
+          ...prev,
+          duration: nextDuration,
+          heartRate: nextHR,
+          calories: nextCalories
+        };
+      });
+    }, 1000);
+  };
+
+  const stopWorkout = () => {
+    clearInterval(sessionTimerRef.current);
+    if (autoSimActive) {
+      clearInterval(autoSimIntervalRef.current);
+      setAutoSimActive(false);
+    }
+    if (activeSession) {
+      const formattedTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      
+      // Update global daily totals!
+      setSteps(prev => prev + (activeSession.steps || 0));
+      setStairsUp(prev => prev + (activeSession.stairsUp || 0));
+      setStairsDown(prev => prev + (activeSession.stairsDown || 0));
+      
+      // Workout contribution to daily rings
+      setWorkoutCalories(prev => prev + (activeSession.calories || 0));
+      setWorkoutMinutes(prev => prev + (Math.round(activeSession.duration / 60) || 1));
+      
+      // Build custom metric text for history log
+      let customMetricText = '';
+      if (['Walking', 'Running', 'Cycling'].includes(activeSession.type)) {
+        customMetricText = `${activeSession.distance} km (${activeSession.steps || 0} Steps)`;
+      } else if (activeSession.type === 'Swimming') {
+        customMetricText = `${activeSession.strokes || 0} Strokes (${activeSession.laps || 0} Laps)`;
+      } else if (['Badminton', 'Tennis'].includes(activeSession.type)) {
+        customMetricText = `${activeSession.swings || 0} Swings`;
+      } else if (activeSession.type === 'Stair Climbing') {
+        customMetricText = `${activeSession.stairsUp || 0} F Up / ${activeSession.stairsDown || 0} F Dn`;
+      } else if (activeSession.type === 'Yoga') {
+        customMetricText = `${activeSession.breaths || 0} deep breaths`;
+      } else {
+        customMetricText = 'Completed';
+      }
+
+      const log = {
+        id: Date.now(),
+        type: activeSession.type,
+        icon: activeSession.icon,
+        duration: Math.round(activeSession.duration / 60) || 1, // minutes
+        calories: activeSession.calories || 1,
+        date: `Today, ${formattedTime}`,
+        heartRate: activeSession.heartRate,
+        customMetric: customMetricText
+      };
+
+      setWorkoutLogs(prev => [log, ...prev]);
+    }
+    setActiveSession(null);
+    setIsPaused(false);
+  };
+
+  // Reset all current progress
+  const resetDailyProgress = () => {
+    if (confirm('Are you sure you want to reset your daily counter?')) {
+      setSteps(0);
+      setStairsUp(0);
+      setStairsDown(0);
+      setWorkoutCalories(0);
+      setWorkoutMinutes(0);
+      setWorkoutLogs([]);
+      localStorage.clear();
+    }
+  };
+
+  // BMI Calculation
+  const calculateBMI = (e) => {
+    e.preventDefault();
+    const h = parseFloat(bmiInput.height) / 100; // cm to m
+    const w = parseFloat(bmiInput.weight);
+    if (h && w) {
+      const score = parseFloat((w / (h * h)).toFixed(1));
+      let desc = 'Normal';
+      if (score < 18.5) desc = 'Underweight';
+      else if (score >= 25 && score < 30) desc = 'Overweight';
+      else if (score >= 30) desc = 'Obese';
+      setBmiResult({ score, desc });
+    }
+  };
+
+  // Pace Calculation
+  const calculatePace = (e) => {
+    e.preventDefault();
+    const dist = parseFloat(paceInput.distance);
+    const min = parseFloat(paceInput.time);
+    if (dist && min) {
+      const paceDecimal = min / dist;
+      const paceMins = Math.floor(paceDecimal);
+      const paceSecs = Math.round((paceDecimal - paceMins) * 60);
+      setPaceResult(`${paceMins}:${paceSecs.toString().padStart(2, '0')} min/km`);
+    }
+  };
+
+  // Target Calorie Planner Calculation
+  const calculateCalorieTarget = (e) => {
+    e.preventDefault();
+    const weight = parseFloat(calorieInput.weight);
+    const factor = parseFloat(calorieInput.activity);
+    if (weight && factor) {
+      // Basic metabolic rate estimate: Weight (kg) * 22
+      const bmr = weight * 22;
+      const tdee = Math.round(bmr * factor);
+      let target = tdee;
+      if (calorieInput.goal === 'loss') target = tdee - 450;
+      else if (calorieInput.goal === 'gain') target = tdee + 400;
+      
+      setCalorieResult({ tdee, target });
+    }
+  };
+
+  // Determine achievement achievements unlocked
+  const checkUnlockedBadges = () => {
+    return {
+      earlyBird: steps > 1000,
+      stairMaster: stairsUp >= 10,
+      superStep: steps >= 10000,
+      courtLegend: workoutLogs.some(log => (log.type === 'Badminton' || log.type === 'Tennis') && log.duration >= 1),
+      aquaman: workoutLogs.some(log => log.type === 'Swimming' && log.duration >= 1),
+      yogaZen: workoutLogs.some(log => log.type === 'Yoga' && log.duration >= 1)
+    };
+  };
+  const badges = checkUnlockedBadges();
+
+  // Ring SVGs Calculations
+  const radiusOuter = 58;
+  const radiusMiddle = 46;
+  const radiusInner = 34;
+
+  const strokeDashOuter = 2 * Math.PI * radiusOuter;
+  const strokeDashMiddle = 2 * Math.PI * radiusMiddle;
+  const strokeDashInner = 2 * Math.PI * radiusInner;
+
+  const pctMove = Math.min(1, moveCalories / goals.move);
+  const pctExercise = Math.min(1, exerciseMinutes / goals.exercise);
+  const pctStand = Math.min(1, standHours / goals.stand);
+
+  const offsetOuter = strokeDashOuter - (pctMove * strokeDashOuter);
+  const offsetMiddle = strokeDashMiddle - (pctExercise * strokeDashMiddle);
+  const offsetInner = strokeDashInner - (pctStand * strokeDashInner);
+
+  return (
+    <div className="app-shell">
+      {/* WORKOUT ACTIVE SESSION SCREEN (OVERLAY OVER EVERYTHING) */}
+      {activeSession ? (
+        <div className="session-panel fade-in">
+          <div className="session-header">
+            <div style={{ fontSize: '48px', marginBottom: '8px' }}>{activeSession.icon}</div>
+            <div className="session-sport">{activeSession.type} WORKOUT</div>
+            <div className="session-timer">
+              {Math.floor(activeSession.duration / 60).toString().padStart(2, '0')}:
+              {(activeSession.duration % 60).toString().padStart(2, '0')}
+            </div>
+          </div>
+
+              <div className="session-stats-grid">
+                <div className="session-stat">
+                  <span className="session-stat-label">Active Calories</span>
+                  <span className="session-stat-value" style={{ color: 'var(--color-move)' }}>
+                    {activeSession.calories} <span style={{ fontSize: '12px' }}>kcal</span>
+                  </span>
+                </div>
+                
+                <div className="session-stat">
+                  <span className="session-stat-label">Heart Rate</span>
+                  <span className="session-stat-value" style={{ color: '#ff453a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <Heart size={16} className="pulse" fill="#ff453a" /> {activeSession.heartRate} <span style={{ fontSize: '12px' }}>bpm</span>
+                  </span>
+                </div>
+
+                {/* Walking, Running, Stair Climbing steps and distance */}
+                {['Running', 'Walking', 'Stair Climbing'].includes(activeSession.type) && (
+                  <>
+                    <div className="session-stat">
+                      <span className="session-stat-label">Steps</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
+                        {activeSession.steps || 0}
+                      </span>
+                    </div>
+                    <div className="session-stat">
+                      <span className="session-stat-label">Distance</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                        {activeSession.distance || 0} <span style={{ fontSize: '12px' }}>km</span>
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Stair Climbing vertical floors */}
+                {activeSession.type === 'Stair Climbing' && (
+                  <>
+                    <div className="session-stat">
+                      <span className="session-stat-label">Stairs Up</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
+                        {activeSession.stairsUp || 0} <span style={{ fontSize: '11px' }}>F</span>
+                      </span>
+                    </div>
+                    <div className="session-stat">
+                      <span className="session-stat-label">Stairs Dn</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                        {activeSession.stairsDown || 0} <span style={{ fontSize: '11px' }}>F</span>
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Swimming details */}
+                {activeSession.type === 'Swimming' && (
+                  <>
+                    <div className="session-stat">
+                      <span className="session-stat-label">Swim Strokes</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                        {activeSession.strokes || 0}
+                      </span>
+                    </div>
+                    <div className="session-stat">
+                      <span className="session-stat-label">Laps</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
+                        {activeSession.laps || 0}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Badminton & Tennis details */}
+                {['Badminton', 'Tennis'].includes(activeSession.type) && (
+                  <div className="session-stat" style={{ gridColumn: 'span 2' }}>
+                    <span className="session-stat-label">Swings</span>
+                    <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                      {activeSession.swings || 0}
+                    </span>
+                  </div>
+                )}
+
+                {/* Cycling details */}
+                {activeSession.type === 'Cycling' && (
+                  <div className="session-stat" style={{ gridColumn: 'span 2' }}>
+                    <span className="session-stat-label">Distance</span>
+                    <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                      {activeSession.distance || 0} <span style={{ fontSize: '12px' }}>km</span>
+                    </span>
+                  </div>
+                )}
+
+                {/* Yoga details */}
+                {activeSession.type === 'Yoga' && (
+                  <div className="session-stat" style={{ gridColumn: 'span 2' }}>
+                    <span className="session-stat-label">Breaths Logged</span>
+                    <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                      {activeSession.breaths || 0}
+                    </span>
+                  </div>
+                )}
+              </div>
+ 
+              {/* Session Simulator Panel */}
+              <div className="glass-panel" style={{ width: '100%', maxWidth: '340px', padding: '14px', margin: '15px 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                    Interactive Session Controls
+                  </span>
+                  
+                  {sensorStatus === 'active' ? (
+                    <span style={{ fontSize: '9px', color: 'var(--color-exercise)', fontWeight: 'bold' }}>📡 SENSOR ACTIVE</span>
+                  ) : (
+                    <button 
+                      onClick={requestSensorPermission} 
+                      style={{
+                        background: 'rgba(255,255,255,0.08)',
+                        color: '#fff',
+                        border: 'none',
+                        padding: '2px 8px',
+                        fontSize: '9px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontWeight: '700'
+                      }}
+                    >
+                      🔗 CONNECT MOBILE SENSOR
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {/* Sport Specific Interactive simulation controls */}
+                  {['Walking', 'Running'].includes(activeSession.type) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px' }} 
+                          onClick={() => handleSessionAddSteps(50)}
+                        >
+                          🚶 Add 50 Steps
+                        </button>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px' }} 
+                          onClick={() => handleSessionAddSteps(200)}
+                        >
+                          🏃 Add 200 Steps
+                        </button>
+                      </div>
+                      
+                      <button 
+                        className={`auto-sim-btn ${autoSimActive ? 'active' : ''}`}
+                        style={{ padding: '8px', fontSize: '11px' }}
+                        onClick={toggleAutoSim}
+                      >
+                        {autoSimActive ? '⏹ Stop Auto Walk Simulator' : '▶ Start Auto Walk Simulator'}
+                      </button>
+                    </div>
+                  )}
+
+                  {activeSession.type === 'Stair Climbing' && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px', color: 'var(--color-exercise)' }} 
+                        onClick={handleSessionAddStairsUp}
+                      >
+                        🪜 Climb Up +1 Floor
+                      </button>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px', color: 'var(--color-stand)' }} 
+                        onClick={handleSessionAddStairsDown}
+                      >
+                        🪜 Descend -1 Floor
+                      </button>
+                    </div>
+                  )}
+
+                  {activeSession.type === 'Swimming' && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px' }} 
+                        onClick={() => handleSessionAddStrokes(10)}
+                      >
+                        🏊 Stroke +10
+                      </button>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px', color: 'var(--color-stand)' }} 
+                        onClick={handleSessionAddLap}
+                      >
+                        🏊 Complete Lap (50m)
+                      </button>
+                    </div>
+                  )}
+
+                  {['Badminton', 'Tennis'].includes(activeSession.type) && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px' }} 
+                        onClick={() => handleSessionAddSwings(10)}
+                      >
+                        🏸 Swing +10
+                      </button>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px', color: 'var(--color-move)' }} 
+                        onClick={() => handleSessionAddSwings(1)}
+                      >
+                        💥 Play Shot +1
+                      </button>
+                    </div>
+                  )}
+
+                  {activeSession.type === 'Cycling' && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px' }} 
+                        onClick={handleSessionAddPedals}
+                      >
+                        🚴 Pedal +500m
+                      </button>
+                    </div>
+                  )}
+
+                  {activeSession.type === 'Yoga' && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button 
+                        className="sim-control-btn" 
+                        style={{ flex: 1, padding: '8px', color: '#bf5af2' }} 
+                        onClick={handleSessionAddBreaths}
+                      >
+                        🧘 Pose Breath +1
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="session-controls">
+                {isPaused ? (
+                  <button className="session-btn session-btn-resume" onClick={resumeWorkout}>
+                    Resume
+                  </button>
+                ) : (
+                  <button className="session-btn session-btn-pause" onClick={pauseWorkout}>
+                    Pause
+                  </button>
+                )}
+                <button className="session-btn session-btn-stop" onClick={stopWorkout}>
+                  End Workout
+                </button>
+              </div>
+            </div>
+          ) : (
+            
+            /* REGULAR CONTENT (TAB CONTROLLED) */
+            <div className="dashboard-content fade-in">
+              
+              {/* Profile / Greeting */}
+              <div className="dashboard-header">
+                <div>
+                  <div className="date-text">MONDAY, JUNE 15</div>
+                  <div className="welcome-text">
+                    {user.isLoggedIn ? `Hi, ${user.name.split(' ')[0]}` : 'Welcome Guest'}
+                  </div>
+                </div>
+                <div className="user-profile" onClick={() => setShowProfileModal(true)} style={{ cursor: 'pointer' }}>
+                  <div className="user-avatar">
+                    {user.isLoggedIn ? getInitials(user.name) : <User size={20} />}
+                  </div>
+                </div>
+              </div>
+
+              {/* TABS */}
+
+              {/* SUMMARY TAB */}
+              {activeTab === 'summary' && (
+                <>
+                  {/* Activity Rings Section */}
+                  <div className="glass-panel" style={{ padding: '16px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase' }}>
+                      Daily Activity Rings
+                    </div>
+                    
+                    <div className="rings-container">
+                      <div className="rings-svg-wrapper">
+                        <svg width="140" height="140" viewBox="0 0 140 140" style={{ transform: 'rotate(-90deg)' }}>
+                          {/* Track Rings Background */}
+                          <circle cx="70" cy="70" r={radiusOuter} fill="transparent" stroke="rgba(255, 27, 85, 0.12)" strokeWidth="10" />
+                          <circle cx="70" cy="70" r={radiusMiddle} fill="transparent" stroke="rgba(0, 249, 104, 0.12)" strokeWidth="10" />
+                          <circle cx="70" cy="70" r={radiusInner} fill="transparent" stroke="rgba(0, 210, 255, 0.12)" strokeWidth="10" />
+                          
+                          {/* Live Animated Rings */}
+                          <circle 
+                            cx="70" cy="70" r={radiusOuter} 
+                            fill="transparent" 
+                            stroke="url(#moveGrad)" 
+                            strokeWidth="10" 
+                            strokeDasharray={strokeDashOuter}
+                            strokeDashoffset={offsetOuter}
+                            strokeLinecap="round"
+                            style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+                          />
+                          <circle 
+                            cx="70" cy="70" r={radiusMiddle} 
+                            fill="transparent" 
+                            stroke="url(#exerciseGrad)" 
+                            strokeWidth="10" 
+                            strokeDasharray={strokeDashMiddle}
+                            strokeDashoffset={offsetMiddle}
+                            strokeLinecap="round"
+                            style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+                          />
+                          <circle 
+                            cx="70" cy="70" r={radiusInner} 
+                            fill="transparent" 
+                            stroke="url(#standGrad)" 
+                            strokeWidth="10" 
+                            strokeDasharray={strokeDashInner}
+                            strokeDashoffset={offsetInner}
+                            strokeLinecap="round"
+                            style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+                          />
+
+                          {/* Gradients */}
+                          <defs>
+                            <linearGradient id="moveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#ff1b55" />
+                              <stop offset="100%" stopColor="#ff5e3a" />
+                            </linearGradient>
+                            <linearGradient id="exerciseGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#00f968" />
+                              <stop offset="100%" stopColor="#b1f900" />
+                            </linearGradient>
+                            <linearGradient id="standGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                              <stop offset="0%" stopColor="#00d2ff" />
+                              <stop offset="100%" stopColor="#0066ff" />
+                            </linearGradient>
+                          </defs>
+                        </svg>
+                        
+                        {/* Center stats summary icon/preview */}
+                        <div style={{
+                          position: 'absolute',
+                          top: '50%',
+                          left: '50%',
+                          transform: 'translate(-50%, -50%)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '2px'
+                        }}>
+                          <Flame size={18} color="var(--color-move)" />
+                        </div>
+                      </div>
+
+                      <div className="rings-info">
+                        <div className="ring-legend-item">
+                          <span className="ring-dot" style={{ backgroundColor: 'var(--color-move)' }}></span>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Move</span>
+                            <span style={{ fontWeight: 'bold' }}>{moveCalories} / {goals.move} kcal</span>
+                          </div>
+                        </div>
+
+                        <div className="ring-legend-item">
+                          <span className="ring-dot" style={{ backgroundColor: 'var(--color-exercise)' }}></span>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Exercise</span>
+                            <span style={{ fontWeight: 'bold' }}>{exerciseMinutes} / {goals.exercise} min</span>
+                          </div>
+                        </div>
+
+                        <div className="ring-legend-item">
+                          <span className="ring-dot" style={{ backgroundColor: 'var(--color-stand)' }}></span>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Stand/Stairs</span>
+                            <span style={{ fontWeight: 'bold' }}>{standHours} / {goals.stand} hr</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Core Metrics Summary Grid */}
+                  <div className="summary-grid">
+                    <div className="glass-panel summary-card card-move">
+                      <span className="card-title">
+                        <Flame size={14} color="var(--color-move)" /> Steps Count
+                      </span>
+                      <span className="card-value">{steps.toLocaleString()}</span>
+                      <span className="card-subtext">{(steps * 0.00075).toFixed(2)} km walked</span>
+                    </div>
+
+                    <div className="glass-panel summary-card card-exercise">
+                      <span className="card-title">
+                        <TrendingUp size={14} color="var(--color-exercise)" /> Upstairs
+                      </span>
+                      <span className="card-value" style={{ color: 'var(--color-exercise)' }}>
+                        {stairsUp} <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Floors</span>
+                      </span>
+                      <span className="card-subtext">🚀 Climbing up</span>
+                    </div>
+
+                    <div className="glass-panel summary-card card-stand">
+                      <span className="card-title">
+                        <TrendingDown size={14} color="var(--color-stand)" /> Downstairs
+                      </span>
+                      <span className="card-value" style={{ color: 'var(--color-stand)' }}>
+                        {stairsDown} <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Floors</span>
+                      </span>
+                      <span className="card-subtext">📉 Going down</span>
+                    </div>
+
+                    <div className="glass-panel summary-card card-stairs">
+                      <span className="card-title">
+                        <Activity size={14} color="var(--color-stairs)" /> Calories
+                      </span>
+                      <span className="card-value" style={{ color: 'var(--color-stairs)' }}>
+                        {moveCalories} <span style={{ fontSize: '12px' }}>kcal</span>
+                      </span>
+                      <span className="card-subtext">Active energy burned</span>
+                    </div>
+                  </div>
+
+                  {/* Select Activity Tip */}
+                  <div className="glass-panel" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Info size={20} color="var(--color-stand)" />
+                    <div style={{ textAlign: 'left', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      <strong>Real-Time Tracking:</strong> To log steps, stairs climbed, or sports swings, navigate to the <strong>Activities</strong> tab and start a workout. Shaking your mobile device or using session simulators will count metrics only for that active session.
+                    </div>
+                  </div>
+
+                  {/* Hourly Chart Bar Graph */}
+                  <div className="glass-panel chart-card">
+                    <div className="chart-header">
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)' }}>STEPS BY HOUR</span>
+                      <span style={{ fontSize: '11px', color: 'var(--color-move)', fontWeight: 'bold' }}>Live Stats</span>
+                    </div>
+                    <div className="chart-bars">
+                      {hourlySteps.map((item, idx) => (
+                        <div key={idx} className="chart-bar-container">
+                          <div 
+                            className="chart-bar-fill" 
+                            style={{ height: `${Math.min(100, (item.count / 1500) * 100)}%`, minHeight: '4px' }}
+                          ></div>
+                          <span className="chart-bar-label">{item.hour}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Achievements Preview */}
+                  <div className="glass-panel" style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)' }}>TODAY'S BADGES</span>
+                      <span style={{ fontSize: '11px', color: '#ffd60a', fontWeight: 'bold' }}>
+                        {Object.values(badges).filter(Boolean).length} / {Object.keys(badges).length} Unlocked
+                      </span>
+                    </div>
+                    
+                    <div className="achievements-grid">
+                      <div className={`badge-card ${badges.earlyBird ? 'unlocked' : ''}`}>
+                        <div className="badge-icon">🏃</div>
+                        <span className="badge-name">Early Walker</span>
+                        <span className="badge-desc">1k+ Steps Today</span>
+                      </div>
+                      
+                      <div className={`badge-card ${badges.stairMaster ? 'unlocked' : ''}`}>
+                        <div className="badge-icon" style={{ background: 'linear-gradient(135deg, #00f968, #b1f900)' }}>🪜</div>
+                        <span className="badge-name">Stair Master</span>
+                        <span className="badge-desc">10 Floors Climbed</span>
+                      </div>
+
+                      <div className={`badge-card ${badges.superStep ? 'unlocked' : ''}`}>
+                        <div className="badge-icon" style={{ background: 'linear-gradient(135deg, #00d2ff, #0066ff)' }}>🏆</div>
+                        <span className="badge-name">Super Step</span>
+                        <span className="badge-desc">10k+ Daily Steps</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={resetDailyProgress}
+                    style={{
+                      background: 'rgba(255, 69, 58, 0.15)',
+                      color: '#ff453a',
+                      border: '1px solid rgba(255, 69, 58, 0.3)',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      width: '100%'
+                    }}
+                  >
+                    Clear All Saved Stats
+                  </button>
+                </>
+              )}
+
+              {/* WORKOUTS TAB */}
+              {activeTab === 'workouts' && (
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  <div style={{ textAlign: 'left', marginBottom: '8px' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Fitness Tools</h2>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Select a tool to begin real-time session tracking.</p>
+                  </div>
+
+                  <div className="workout-list">
+                    {workoutsList.map((workout, idx) => (
+                      <div 
+                        key={idx} 
+                        className="glass-panel workout-item"
+                        onClick={() => startWorkout(workout)}
+                      >
+                        <div className="workout-item-left">
+                          <div className="workout-icon-box" style={{ background: workout.color }}>
+                            <span style={{ fontSize: '22px' }}>{workout.icon}</span>
+                          </div>
+                          <div className="workout-details">
+                            <span className="workout-name">{workout.type}</span>
+                            <span className="workout-desc">Est. {workout.calorieBurnRate} kcal/min • Heart rate active</span>
+                          </div>
+                        </div>
+                        <ChevronRight size={18} color="var(--text-muted)" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* TOOLS TAB */}
+              {activeTab === 'tools' && (
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ textAlign: 'left', marginBottom: '4px' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Calculators & Planners</h2>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>Interactive tools to optimize your fitness goals.</p>
+                  </div>
+
+                  <div className="tools-grid">
+                    {/* BMI Calculator */}
+                    <div className="glass-panel tool-card">
+                      <span className="tool-title">
+                        <Calculator size={16} color="var(--color-stand)" /> BMI Calculator
+                      </span>
+                      <form className="tool-form" onSubmit={calculateBMI}>
+                        <div className="tool-input-row">
+                          <div className="tool-input-col">
+                            <span className="tool-label">Height (cm)</span>
+                            <input 
+                              type="number" 
+                              required 
+                              placeholder="175"
+                              className="tool-input"
+                              value={bmiInput.height}
+                              onChange={e => setBmiInput({...bmiInput, height: e.target.value})}
+                            />
+                          </div>
+                          <div className="tool-input-col">
+                            <span className="tool-label">Weight (kg)</span>
+                            <input 
+                              type="number" 
+                              required 
+                              placeholder="70" 
+                              className="tool-input"
+                              value={bmiInput.weight}
+                              onChange={e => setBmiInput({...bmiInput, weight: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <button type="submit" className="tool-btn">Calculate BMI</button>
+                      </form>
+                      {bmiResult && (
+                        <div className="tool-result">
+                          BMI Score: <strong>{bmiResult.score}</strong> ({bmiResult.desc})
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Pace Calculator */}
+                    <div className="glass-panel tool-card">
+                      <span className="tool-title">
+                        <Timer size={16} color="var(--color-exercise)" /> Pace Calculator
+                      </span>
+                      <form className="tool-form" onSubmit={calculatePace}>
+                        <div className="tool-input-row">
+                          <div className="tool-input-col">
+                            <span className="tool-label">Distance (km)</span>
+                            <input 
+                              type="number" 
+                              step="0.1"
+                              required 
+                              placeholder="5" 
+                              className="tool-input"
+                              value={paceInput.distance}
+                              onChange={e => setPaceInput({...paceInput, distance: e.target.value})}
+                            />
+                          </div>
+                          <div className="tool-input-col">
+                            <span className="tool-label">Time (minutes)</span>
+                            <input 
+                              type="number" 
+                              required 
+                              placeholder="25" 
+                              className="tool-input"
+                              value={paceInput.time}
+                              onChange={e => setPaceInput({...paceInput, time: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                        <button type="submit" className="tool-btn">Calculate Pace</button>
+                      </form>
+                      {paceResult && (
+                        <div className="tool-result">
+                          Pace Required: <strong>{paceResult}</strong>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Calorie Target Planner */}
+                    <div className="glass-panel tool-card" style={{ gridColumn: 'span 1' }}>
+                      <span className="tool-title">
+                        <Flame size={16} color="var(--color-move)" /> Target Calorie Planner
+                      </span>
+                      <form className="tool-form" onSubmit={calculateCalorieTarget}>
+                        <div className="tool-input-col">
+                          <span className="tool-label">Weight (kg)</span>
+                          <input 
+                            type="number" 
+                            required 
+                            placeholder="70" 
+                            className="tool-input"
+                            value={calorieInput.weight}
+                            onChange={e => setCalorieInput({...calorieInput, weight: e.target.value})}
+                          />
+                        </div>
+                        <div className="tool-input-row">
+                          <div className="tool-input-col">
+                            <span className="tool-label">Goal</span>
+                            <select 
+                              className="tool-input"
+                              value={calorieInput.goal}
+                              onChange={e => setCalorieInput({...calorieInput, goal: e.target.value})}
+                              style={{ background: '#1c1c1e', color: '#fff' }}
+                            >
+                              <option value="loss">Weight Loss</option>
+                              <option value="maintain">Maintenance</option>
+                              <option value="gain">Weight Gain</option>
+                            </select>
+                          </div>
+                          <div className="tool-input-col">
+                            <span className="tool-label">Activity Multiplier</span>
+                            <select 
+                              className="tool-input"
+                              value={calorieInput.activity}
+                              onChange={e => setCalorieInput({...calorieInput, activity: e.target.value})}
+                              style={{ background: '#1c1c1e', color: '#fff' }}
+                            >
+                              <option value="1.2">Sedentary (1.2)</option>
+                              <option value="1.375">Lightly Active (1.375)</option>
+                              <option value="1.55">Moderately Active (1.55)</option>
+                              <option value="1.725">Highly Active (1.725)</option>
+                            </select>
+                          </div>
+                        </div>
+                        <button type="submit" className="tool-btn">Calculate Daily Target</button>
+                      </form>
+                      {calorieResult && (
+                        <div className="tool-result" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span>Daily Maintenance (TDEE): <strong>{calorieResult.tdee} kcal</strong></span>
+                          <span>Target Recommendation: <strong style={{ color: 'var(--color-move)' }}>{calorieResult.target} kcal/day</strong></span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* HISTORY / LOGS TAB */}
+              {activeTab === 'history' && (
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Workout Logs</h2>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <History size={14} /> Historical
+                    </span>
+                  </div>
+
+                  <div className="history-list">
+                    {workoutLogs.length === 0 ? (
+                      <div className="glass-panel" style={{ padding: '30px', textAlign: 'center', color: 'var(--text-secondary)' }}>
+                        No workouts tracked yet. Go to Workouts to start!
+                      </div>
+                    ) : (
+                      workoutLogs.map((log) => (
+                        <div key={log.id} className="history-card">
+                          <div className="history-left">
+                            <div style={{
+                              width: '32px',
+                              height: '32px',
+                              borderRadius: '8px',
+                              backgroundColor: 'rgba(255,255,255,0.08)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}>
+                              <span style={{ fontSize: '18px' }}>{log.icon || '🏃'}</span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', textAlign: 'left' }}>
+                              <strong style={{ fontSize: '13px' }}>{log.type} Workout</strong>
+                              <span style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>{log.date}</span>
+                            </div>
+                          </div>
+
+                          <div className="history-right">
+                            <span style={{ color: 'var(--color-move)', fontWeight: 'bold', fontSize: '13px' }}>
+                              +{log.calories} kcal
+                            </span>
+                            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                              {log.duration} min • {log.customMetric || `${log.heartRate || 120} bpm`}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {/* Lifetime Statistics */}
+                  <div className="glass-panel" style={{ padding: '16px', textAlign: 'left' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+                      Lifetime Stats
+                    </span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>TOTAL WORKOUTS</span>
+                        <strong style={{ fontSize: '18px' }}>{workoutLogs.length} Sessions</strong>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', borderRadius: '8px' }}>
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'block' }}>TOTAL CALORIES BURNED</span>
+                        <strong style={{ fontSize: '18px', color: 'var(--color-move)' }}>{workoutCalories} kcal</strong>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* Nav Tab Bar */}
+          {!activeSession && (
+            <div className="nav-tab-bar">
+              <button 
+                className={`nav-tab ${activeTab === 'summary' ? 'active' : ''}`}
+                onClick={() => setActiveTab('summary')}
+              >
+                <Activity size={20} />
+                <span>Summary</span>
+              </button>
+              <button 
+                className={`nav-tab ${activeTab === 'workouts' ? 'active' : ''}`}
+                onClick={() => setActiveTab('workouts')}
+                style={{ color: activeTab === 'workouts' ? 'var(--color-exercise)' : '' }}
+              >
+                <Trophy size={20} />
+                <span>Fitness Tools</span>
+              </button>
+              <button 
+                className={`nav-tab ${activeTab === 'tools' ? 'active' : ''}`}
+                onClick={() => setActiveTab('tools')}
+                style={{ color: activeTab === 'tools' ? 'var(--color-stand)' : '' }}
+              >
+                <Calculator size={20} />
+                <span>Calculators</span>
+              </button>
+              <button 
+                className={`nav-tab ${activeTab === 'history' ? 'active' : ''}`}
+                onClick={() => setActiveTab('history')}
+                style={{ color: activeTab === 'history' ? '#ffd60a' : '' }}
+              >
+                <History size={20} />
+                <span>History</span>
+              </button>
+            </div>
+          )}
+
+          {/* User Profile / Login Modal */}
+          {showProfileModal && (
+            <div className="modal-overlay" onClick={() => setShowProfileModal(false)}>
+              <div className="glass-panel modal-card fade-in" onClick={e => e.stopPropagation()}>
+                <button className="modal-close" onClick={() => setShowProfileModal(false)}>
+                  &times;
+                </button>
+                
+                {user.isLoggedIn ? (
+                  <div className="profile-card-details">
+                    <div className="profile-avatar-large">
+                      {getInitials(user.name)}
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: '22px', fontWeight: '800', fontFamily: 'var(--font-display)' }}>{user.name}</h3>
+                      <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{user.email}</span>
+                    </div>
+
+                    <div className="profile-stats-grid">
+                      <div className="profile-stat-box">
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>STEPS TODAY</span>
+                        <span className="profile-stat-val" style={{ color: 'var(--color-exercise)' }}>{steps.toLocaleString()}</span>
+                      </div>
+                      <div className="profile-stat-box">
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>CALORIES</span>
+                        <span className="profile-stat-val" style={{ color: 'var(--color-move)' }}>{moveCalories} kcal</span>
+                      </div>
+                      <div className="profile-stat-box">
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>UPSTAIRS</span>
+                        <span className="profile-stat-val" style={{ color: 'var(--color-exercise)' }}>{stairsUp} F</span>
+                      </div>
+                      <div className="profile-stat-box">
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>WORKOUTS</span>
+                        <span className="profile-stat-val" style={{ color: 'var(--color-stairs)' }}>{workoutLogs.length}</span>
+                      </div>
+                    </div>
+
+                    <button 
+                      className="auth-btn" 
+                      style={{ 
+                        width: '100%', 
+                        background: 'rgba(255, 69, 58, 0.15)', 
+                        color: '#ff453a', 
+                        border: '1px solid rgba(255, 69, 58, 0.3)', 
+                        boxShadow: 'none' 
+                      }} 
+                      onClick={handleLogout}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="auth-header">
+                      <h3 className="auth-title">{authMode === 'login' ? 'Sign In' : 'Create Account'}</h3>
+                      <p className="auth-subtitle">Sync your Apple Fitness rings & logs to your account</p>
+                    </div>
+                    
+                    <form className="auth-form" onSubmit={handleAuthSubmit}>
+                      {authMode === 'signup' && (
+                        <div className="auth-field">
+                          <label className="tool-label">Full Name</label>
+                          <input 
+                            type="text" 
+                            required 
+                            placeholder="John Doe" 
+                            className="auth-input"
+                            value={authName}
+                            onChange={e => setAuthName(e.target.value)}
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="auth-field">
+                        <label className="tool-label">Email Address</label>
+                        <input 
+                          type="email" 
+                          required 
+                          placeholder="john@example.com" 
+                          className="auth-input"
+                          value={authEmail}
+                          onChange={e => setAuthEmail(e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="auth-field">
+                        <label className="tool-label">Password</label>
+                        <input 
+                          type="password" 
+                          required 
+                          placeholder="••••••••" 
+                          className="auth-input"
+                          value={authPassword}
+                          onChange={e => setAuthPassword(e.target.value)}
+                        />
+                      </div>
+                      
+                      <button type="submit" className="auth-btn" style={{ marginTop: '10px' }}>
+                        {authMode === 'login' ? 'Sign In with Email' : 'Register Account'}
+                      </button>
+                    </form>
+
+                    <p className="auth-toggle-text">
+                      {authMode === 'login' ? "Don't have an account? " : "Already have an account? "}
+                      <span className="auth-toggle-link" onClick={() => setAuthMode(authMode === 'login' ? 'signup' : 'login')}>
+                        {authMode === 'login' ? 'Sign Up' : 'Sign In'}
+                      </span>
+                    </p>
+
+                    <div className="social-auth">
+                      <button className="social-btn social-btn-apple" onClick={() => {
+                        setUser({ name: 'Apple User', email: 'apple.id@icloud.com', isLoggedIn: true });
+                        setShowProfileModal(false);
+                      }}>
+                         Sign In with Apple
+                      </button>
+                      <button className="social-btn" onClick={() => {
+                        setUser({ name: 'Google User', email: 'google.account@gmail.com', isLoggedIn: true });
+                        setShowProfileModal(false);
+                      }}>
+                        Sign In with Google
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
