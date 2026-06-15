@@ -301,9 +301,12 @@ export default function App() {
       setShowProfileModal(false);
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/invalid-api-key') {
+      if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/configuration-not-found' || err.code === 'auth/invalid-api-key' || err.code === 'auth/internal-error') {
+        console.warn('Google Auth is not enabled in Firebase Console. Falling back to mock login.');
         setUser({ name: 'Google User', email: 'google.account@gmail.com', isLoggedIn: true });
         setShowProfileModal(false);
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setAuthError('Sign-in popup closed by user.');
       } else {
         setAuthError(err.message);
       }
@@ -329,9 +332,12 @@ export default function App() {
       setShowProfileModal(false);
     } catch (err) {
       console.error(err);
-      if (err.code === 'auth/invalid-api-key') {
+      if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/configuration-not-found' || err.code === 'auth/invalid-api-key' || err.code === 'auth/internal-error') {
+        console.warn('Apple Auth is not configured in Firebase Console. Falling back to mock login.');
         setUser({ name: 'Apple User', email: 'apple.id@icloud.com', isLoggedIn: true });
         setShowProfileModal(false);
+      } else if (err.code === 'auth/popup-closed-by-user') {
+        setAuthError('Sign-in popup closed by user.');
       } else {
         setAuthError(err.message);
       }
@@ -352,6 +358,18 @@ export default function App() {
       if (autoSimIntervalRef.current) clearInterval(autoSimIntervalRef.current);
     };
   }, []);
+
+  // Disable body scroll when modal is open or active workout session is running
+  useEffect(() => {
+    if (showProfileModal || activeSession) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [showProfileModal, activeSession]);
 
   // Update hourly charts dynamically when steps update
   useEffect(() => {
@@ -1757,13 +1775,7 @@ export default function App() {
                     </p>
 
                     <div className="social-auth">
-                      <button className="social-btn social-btn-apple" onClick={handleAppleSignIn}>
-                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style={{ marginRight: '8px' }}>
-                          <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.48C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.1 16.67C20.08 16.74 19.67 18.11 18.71 19.5M15.97 4.17C16.63 3.37 17.07 2.28 16.95 1C15.85 1.04 14.51 1.73 13.73 2.64C13.07 3.41 12.49 4.52 12.64 5.78C13.87 5.87 15.12 5.17 15.97 4.17Z" />
-                        </svg>
-                        {authMode === 'login' ? 'Sign In with Apple' : 'Sign Up with Apple'}
-                      </button>
-                      <button className="social-btn" onClick={handleGoogleSignIn}>
+                      <button className="social-btn" onClick={handleGoogleSignIn} style={{ width: '100%' }}>
                         <svg viewBox="0 0 24 24" width="16" height="16" style={{ marginRight: '8px' }}>
                           <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
                           <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.77c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
