@@ -27,8 +27,10 @@ import {
   updateProfile,
   signOut,
   onAuthStateChanged,
-  signInWithPopup
+  signInWithPopup,
+  db
 } from './firebase';
+import { doc, onSnapshot, setDoc } from "firebase/firestore";
 
 export default function App() {
   // Navigation tab within app
@@ -69,7 +71,11 @@ export default function App() {
   // Water Intake State
   const [waterIntake, setWaterIntake] = useState(() => parseInt(getSavedMetric('water_intake', '0'), 10));
 
-
+  // Live Smart Device Ticker & Cloud Sync State variables
+  const [liveTracking, setLiveTracking] = useState(true);
+  const [currentHeartRate, setCurrentHeartRate] = useState(72);
+  const [syncStatus, setSyncStatus] = useState('local'); // local, syncing, synced, error
+  const lastSyncRef = useRef(null);
 
   // Derived state
   const [workoutCalories, setWorkoutCalories] = useState(() => parseInt(getSavedMetric('workout_calories', '0'), 10));
@@ -212,6 +218,152 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('fit_user', JSON.stringify(user));
   }, [user]);
+
+  // Sync background heart rate monitor with active workout session heart rate
+  useEffect(() => {
+    if (activeSession && activeSession.heartRate) {
+      setCurrentHeartRate(activeSession.heartRate);
+    }
+  }, [activeSession?.heartRate]);
+
+  // Background Activity Live Ticker (Simulates live Apple Watch data in real-time)
+  useEffect(() => {
+    if (!liveTracking) return;
+
+    // 1. Rest Heart Rate fluctuation loop
+    const hrInterval = setInterval(() => {
+      if (activeSession) return; // Active workout takes priority
+      setCurrentHeartRate(prev => {
+        const baseline = 72 + Math.sin(Date.now() / 18000) * 6;
+        const change = (Math.random() - 0.5) * 5;
+        const target = Math.round((prev + baseline) / 2 + change);
+        return Math.max(58, Math.min(95, target));
+      });
+    }, 2000);
+
+    // 2. Passive background steps generator (updates rings/counters live)
+    const activityInterval = setInterval(() => {
+      if (activeSession) return; // Workout simulator controls workout stats
+
+      if (Math.random() > 0.6) {
+        const stepAdd = Math.floor(Math.random() * 4) + 1;
+        setSteps(prev => prev + stepAdd);
+
+        // Climb random stairs occasionally
+        if (Math.random() > 0.97) {
+          setStairsUp(prev => prev + 1);
+        }
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(hrInterval);
+      clearInterval(activityInterval);
+    };
+  }, [liveTracking, activeSession]);
+
+  // Firestore Database subscription (Read real-time documents)
+  useEffect(() => {
+    const isMockFirebase = import.meta.env.VITE_FIREBASE_API_KEY === 'AIzaSyPlaceholderKeyForViteDevBuild' || !import.meta.env.VITE_FIREBASE_API_KEY;
+    if (isMockFirebase || !user.isLoggedIn || !user.email) {
+      setSyncStatus('local');
+      return;
+    }
+
+    setSyncStatus('syncing');
+    const userDocRef = doc(db, "users", user.email, "fitness", "dailyStats");
+    const unsubscribe = onSnapshot(userDocRef, (snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        lastSyncRef.current = data;
+        
+        if (data.steps !== undefined && data.steps !== steps) setSteps(data.steps);
+        if (data.stairsUp !== undefined && data.stairsUp !== stairsUp) setStairsUp(data.stairsUp);
+        if (data.stairsDown !== undefined && data.stairsDown !== stairsDown) setStairsDown(data.stairsDown);
+        if (data.workoutCalories !== undefined && data.workoutCalories !== workoutCalories) setWorkoutCalories(data.workoutCalories);
+        if (data.workoutMinutes !== undefined && data.workoutMinutes !== workoutMinutes) setWorkoutMinutes(data.workoutMinutes);
+        if (data.waterIntake !== undefined && data.waterIntake !== waterIntake) setWaterIntake(data.waterIntake);
+        if (data.goals !== undefined && JSON.stringify(data.goals) !== JSON.stringify(goals)) setGoals(data.goals);
+        if (data.workoutLogs !== undefined && JSON.stringify(data.workoutLogs) !== JSON.stringify(workoutLogs)) setWorkoutLogs(data.workoutLogs);
+        
+        setSyncStatus('synced');
+      } else {
+        setDoc(userDocRef, {
+          steps,
+          stairsUp,
+          stairsDown,
+          workoutCalories,
+          workoutMinutes,
+          waterIntake,
+          goals,
+          workoutLogs
+        }, { merge: true })
+        .then(() => setSyncStatus('synced'))
+        .catch(err => {
+          console.error("Firestore sync init failed:", err);
+          setSyncStatus('error');
+        });
+      }
+    }, (err) => {
+      console.error("Firestore sync subscription error:", err);
+      setSyncStatus('error');
+    });
+
+    return () => unsubscribe();
+  }, [user.email, user.isLoggedIn]);
+
+  // Firestore Database write (Sync changed data to Firestore in real-time)
+  useEffect(() => {
+    const isMockFirebase = import.meta.env.VITE_FIREBASE_API_KEY === 'AIzaSyPlaceholderKeyForViteDevBuild' || !import.meta.env.VITE_FIREBASE_API_KEY;
+    if (isMockFirebase || !user.isLoggedIn || !user.email) return;
+
+    const hasChanges = !lastSyncRef.current || 
+      steps !== lastSyncRef.current.steps ||
+      stairsUp !== lastSyncRef.current.stairsUp ||
+      stairsDown !== lastSyncRef.current.stairsDown ||
+      workoutCalories !== lastSyncRef.current.workoutCalories ||
+      workoutMinutes !== lastSyncRef.current.workoutMinutes ||
+      waterIntake !== lastSyncRef.current.waterIntake ||
+      JSON.stringify(goals) !== JSON.stringify(lastSyncRef.current.goals) ||
+      JSON.stringify(workoutLogs) !== JSON.stringify(lastSyncRef.current.workoutLogs);
+
+    if (!hasChanges) return;
+
+    // Debounce to prevent throttling
+    const syncTimeout = setTimeout(() => {
+      setSyncStatus('syncing');
+      const userDocRef = doc(db, "users", user.email, "fitness", "dailyStats");
+      setDoc(userDocRef, {
+        steps,
+        stairsUp,
+        stairsDown,
+        workoutCalories,
+        workoutMinutes,
+        waterIntake,
+        goals,
+        workoutLogs
+      }, { merge: true })
+      .then(() => {
+        setSyncStatus('synced');
+        lastSyncRef.current = {
+          steps,
+          stairsUp,
+          stairsDown,
+          workoutCalories,
+          workoutMinutes,
+          waterIntake,
+          goals,
+          workoutLogs
+        };
+      })
+      .catch((err) => {
+        console.error("Firestore sync write failed:", err);
+        setSyncStatus('error');
+      });
+    }, 1200);
+
+    return () => clearTimeout(syncTimeout);
+  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, waterIntake, goals, workoutLogs, user.email, user.isLoggedIn]);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -1243,6 +1395,52 @@ export default function App() {
                       {user.isLoggedIn ? getInitials(user.name) : <User size={20} />}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Live Tracking Connection Status Badge */}
+              <div className="glass-panel live-tracker-bar" style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: '600',
+                borderLeft: '4px solid var(--color-exercise)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span className="live-pulse-dot"></span>
+                  <span style={{ color: 'var(--text-primary)' }}>
+                    APPLE WATCH CONNECTED
+                  </span>
+                  <span style={{ color: 'var(--text-secondary)', fontSize: '10px', fontWeight: 'normal' }}>
+                    {syncStatus === 'synced' ? '• Cloud Synced' : syncStatus === 'syncing' ? '• Syncing...' : '• Local Mode'}
+                  </span>
+                </div>
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ff453a' }}>
+                    <Heart size={14} className="pulse" fill="#ff453a" />
+                    <span>{currentHeartRate} <span style={{ fontSize: '10px' }}>BPM</span></span>
+                  </div>
+                  <button 
+                    onClick={() => setLiveTracking(prev => !prev)}
+                    className="live-toggle-btn"
+                    style={{
+                      background: 'rgba(255,255,255,0.08)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      color: 'var(--text-secondary)',
+                      fontSize: '10px',
+                      cursor: 'pointer',
+                      fontWeight: '700',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {liveTracking ? 'PAUSE LIVE' : 'START LIVE'}
+                  </button>
                 </div>
               </div>
 
