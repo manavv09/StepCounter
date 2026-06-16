@@ -57,12 +57,19 @@ export default function App() {
   const [stairsUp, setStairsUp] = useState(() => parseInt(getSavedMetric('stairs_up', '0'), 10));
   const [stairsDown, setStairsDown] = useState(() => parseInt(getSavedMetric('stairs_down', '0'), 10));
   
-  // Custom Fitness Goals
-  const [goals, setGoals] = useState({
-    move: 500,       // Calories (kcal)
-    exercise: 30,    // Minutes
-    stand: 12        // Stairs up / Stand points
+  // Custom Fitness Goals (Saved in LocalStorage, scoped by user)
+  const [goals, setGoals] = useState(() => {
+    const saved = getSavedMetric('goals', null);
+    return saved ? JSON.parse(saved) : { move: 500, exercise: 30, stand: 12 };
   });
+
+  // Goals customization editor open/close state
+  const [showGoalsEditor, setShowGoalsEditor] = useState(false);
+
+  // Water Intake State
+  const [waterIntake, setWaterIntake] = useState(() => parseInt(getSavedMetric('water_intake', '0'), 10));
+
+
 
   // Derived state
   const [workoutCalories, setWorkoutCalories] = useState(() => parseInt(getSavedMetric('workout_calories', '0'), 10));
@@ -178,6 +185,12 @@ export default function App() {
     
     const savedLogs = localStorage.getItem(`fit_${keyPrefix}_workout_logs`);
     setWorkoutLogs(savedLogs ? JSON.parse(savedLogs) : []);
+
+    const savedWater = localStorage.getItem(`fit_${keyPrefix}_water_intake`);
+    setWaterIntake(savedWater ? parseInt(savedWater, 10) : 0);
+
+    const savedGoals = localStorage.getItem(`fit_${keyPrefix}_goals`);
+    setGoals(savedGoals ? JSON.parse(savedGoals) : { move: 500, exercise: 30, stand: 12 });
   }, [user.email, user.isLoggedIn]);
 
   // Save user-scoped metrics on state changes
@@ -191,8 +204,10 @@ export default function App() {
       localStorage.setItem(`fit_${keyPrefix}_workout_calories`, workoutCalories);
       localStorage.setItem(`fit_${keyPrefix}_workout_minutes`, workoutMinutes);
       localStorage.setItem(`fit_${keyPrefix}_workout_logs`, JSON.stringify(workoutLogs));
+      localStorage.setItem(`fit_${keyPrefix}_water_intake`, waterIntake);
+      localStorage.setItem(`fit_${keyPrefix}_goals`, JSON.stringify(goals));
     }
-  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, workoutLogs, user]);
+  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, workoutLogs, waterIntake, goals, user]);
 
   useEffect(() => {
     localStorage.setItem('fit_user', JSON.stringify(user));
@@ -624,7 +639,8 @@ export default function App() {
       strokes: 0,
       swings: 0,
       laps: 0,
-      breaths: 0
+      breaths: 0,
+      heartRateHistory: [workout.baseHeartRate]
     });
 
     sessionTimerRef.current = setInterval(() => {
@@ -651,11 +667,16 @@ export default function App() {
 
         const nextCalories = Math.round(timeCalories + actionCalories);
 
+        // Maintain scrolling history
+        const history = prev.heartRateHistory ? [...prev.heartRateHistory, nextHR] : [nextHR];
+        if (history.length > 15) history.shift();
+
         return {
           ...prev,
           duration: nextDuration,
           heartRate: nextHR,
-          calories: nextCalories
+          calories: nextCalories,
+          heartRateHistory: history
         };
       });
     }, 1000);
@@ -687,11 +708,15 @@ export default function App() {
 
         const nextCalories = Math.round(timeCalories + actionCalories);
 
+        const history = prev.heartRateHistory ? [...prev.heartRateHistory, nextHR] : [nextHR];
+        if (history.length > 15) history.shift();
+
         return {
           ...prev,
           duration: nextDuration,
           heartRate: nextHR,
-          calories: nextCalories
+          calories: nextCalories,
+          heartRateHistory: history
         };
       });
     }, 1000);
@@ -949,6 +974,93 @@ export default function App() {
                   </div>
                 )}
               </div>
+
+              {/* Scrolling Heart Rate Line Chart */}
+              {(() => {
+                const hrPoints = activeSession.heartRateHistory || [];
+                const currentHR = activeSession.heartRate || 120;
+                
+                // Determine HR zone name and styling class
+                let zoneName = 'Warm Up';
+                let zoneClass = 'hr-zone-fatburn';
+                if (currentHR > 150) {
+                  zoneName = 'Peak Zone';
+                  zoneClass = 'hr-zone-peak';
+                } else if (currentHR >= 115) {
+                  zoneName = 'Cardio Zone';
+                  zoneClass = 'hr-zone-cardio';
+                }
+
+                const getHeartRateSVGPath = () => {
+                  if (hrPoints.length < 2) return '';
+                  const xSpacing = 280 / 14; // max 15 points
+                  const yMin = 70;
+                  const yMax = 180;
+                  const pointsStr = hrPoints.map((hr, index) => {
+                    const x = 10 + index * xSpacing;
+                    const pct = (hr - yMin) / (yMax - yMin);
+                    const y = 60 - Math.min(1, Math.max(0, pct)) * 50; // clamp y between 10 and 60
+                    return `${x},${y}`;
+                  });
+                  return `M ${pointsStr.join(' L ')}`;
+                };
+
+                const latestPoint = () => {
+                  if (hrPoints.length === 0) return { x: 10, y: 35 };
+                  const index = hrPoints.length - 1;
+                  const xSpacing = 280 / 14;
+                  const hr = hrPoints[index];
+                  const x = 10 + index * xSpacing;
+                  const pct = (hr - 70) / (180 - 70);
+                  const y = 60 - Math.min(1, Math.max(0, pct)) * 50;
+                  return { x, y };
+                };
+
+                const pt = latestPoint();
+
+                return (
+                  <div className="hr-chart-wrapper">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                        Live Heart Rate Graph
+                      </span>
+                      <span className={`hr-zone-badge ${zoneClass}`}>
+                        {zoneName}
+                      </span>
+                    </div>
+                    <svg width="100%" height="70" viewBox="0 0 300 70">
+                      {/* Grid Lines */}
+                      <g className="hr-chart-grid">
+                        <line x1="0" y1="10" x2="300" y2="10" />
+                        <line x1="0" y1="35" x2="300" y2="35" />
+                        <line x1="0" y1="60" x2="300" y2="60" />
+                      </g>
+                      
+                      {/* Heart Rate Graph Line */}
+                      {hrPoints.length >= 2 && (
+                        <path 
+                          d={getHeartRateSVGPath()} 
+                          fill="none" 
+                          stroke="#ff453a" 
+                          strokeWidth="2.5" 
+                          className="hr-chart-line" 
+                        />
+                      )}
+                      
+                      {/* Pulsing indicator dot on last point */}
+                      <circle 
+                        cx={pt.x} 
+                        cy={pt.y} 
+                        r="4.5" 
+                        fill="#ff453a" 
+                        className="pulse" 
+                        stroke="#fff"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
+                  </div>
+                );
+              })()}
  
               {/* Session Simulator Panel */}
               <div className="glass-panel" style={{ width: '100%', maxWidth: '340px', padding: '14px', margin: '15px 0' }}>
@@ -1115,17 +1227,21 @@ export default function App() {
               {/* Profile / Greeting */}
               <div className="dashboard-header">
                 <div>
-                  <div className="date-text">MONDAY, JUNE 15</div>
+                  <div className="date-text">
+                    {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}
+                  </div>
                   <div className="welcome-text">
                     {user.isLoggedIn ? `Hi, ${user.name.split(' ')[0]}` : 'Welcome Guest'}
                   </div>
                 </div>
-                <div className="user-profile" onClick={() => {
-                  setShowProfileModal(true);
-                  setAuthError('');
-                }} style={{ cursor: 'pointer' }}>
-                  <div className="user-avatar">
-                    {user.isLoggedIn ? getInitials(user.name) : <User size={20} />}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div className="user-profile" onClick={() => {
+                    setShowProfileModal(true);
+                    setAuthError('');
+                  }} style={{ cursor: 'pointer' }}>
+                    <div className="user-avatar">
+                      {user.isLoggedIn ? getInitials(user.name) : <User size={20} />}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1137,9 +1253,61 @@ export default function App() {
                 <>
                   {/* Activity Rings Section */}
                   <div className="glass-panel" style={{ padding: '16px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '10px', textTransform: 'uppercase' }}>
-                      Daily Activity Rings
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                        Daily Activity Rings
+                      </span>
+                      <button 
+                        onClick={() => setShowGoalsEditor(!showGoalsEditor)}
+                        style={{
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--color-stand)',
+                          fontSize: '11px',
+                          cursor: 'pointer',
+                          fontWeight: '700',
+                          padding: '2px 6px',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        {showGoalsEditor ? 'Close' : '✏️ Set Goals'}
+                      </button>
                     </div>
+
+                    {showGoalsEditor && (
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', animation: 'fadeIn 0.2s' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>MOVE (KCAL)</span>
+                          <input 
+                            type="number" 
+                            value={goals.move} 
+                            onChange={e => setGoals(prev => ({ ...prev, move: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                            className="auth-input" 
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>EXERCISE (MIN)</span>
+                          <input 
+                            type="number" 
+                            value={goals.exercise} 
+                            onChange={e => setGoals(prev => ({ ...prev, exercise: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                            className="auth-input" 
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>STAND (HRS)</span>
+                          <input 
+                            type="number" 
+                            value={goals.stand} 
+                            onChange={e => setGoals(prev => ({ ...prev, stand: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                            className="auth-input" 
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          />
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="rings-container">
                       <div className="rings-svg-wrapper">
@@ -1306,6 +1474,37 @@ export default function App() {
                           <span className="chart-bar-label">{item.hour}</span>
                         </div>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Water Tracker Widget */}
+                  <div className="glass-panel" style={{ padding: '16px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '12px', textTransform: 'uppercase', textAlign: 'left' }}>
+                      Hydration Tracker
+                    </div>
+                    <div className="water-container">
+                      <div className="water-wave-box">
+                        <div className="water-wave-liquid" style={{ height: `${Math.min(100, (waterIntake / 2000) * 100)}%` }}></div>
+                        <div className="water-wave-anim" style={{ top: `-${Math.min(100, (waterIntake / 2000) * 100) + 10}%` }}></div>
+                        <span className="water-percentage">{Math.round((waterIntake / 2000) * 100)}%</span>
+                      </div>
+                      <div className="water-controls-panel">
+                        <div style={{ textAlign: 'left' }}>
+                          <strong style={{ fontSize: '15px', color: 'var(--text-primary)' }}>{waterIntake} ml</strong>
+                          <span style={{ fontSize: '11px', color: 'var(--text-secondary)', display: 'block' }}>Daily Target: 2,000 ml (2L)</span>
+                        </div>
+                        <div className="water-btn-row">
+                          <button className="water-add-btn" onClick={() => setWaterIntake(prev => prev + 250)}>
+                            💧 +250ml
+                          </button>
+                          <button className="water-add-btn" onClick={() => setWaterIntake(prev => prev + 500)}>
+                            🍼 +500ml
+                          </button>
+                        </div>
+                        <button className="water-reset-btn" onClick={() => setWaterIntake(0)}>
+                          Reset
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1586,6 +1785,36 @@ export default function App() {
                     )}
                   </div>
 
+                  {/* Weekly Trends Card */}
+                  <div className="glass-panel trends-chart-wrapper" style={{ padding: '16px', textAlign: 'left' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '4px' }}>
+                      Weekly Activity Trends
+                    </span>
+                    <span style={{ fontSize: '9px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '8px' }}>
+                      Move (Pink) • Exercise (Green) • Stand (Blue) completion %
+                    </span>
+                    <div className="trends-bars-container">
+                      {[
+                        { day: 'M', move: 70, exercise: 80, stand: 55 },
+                        { day: 'T', move: 95, exercise: 90, stand: 70 },
+                        { day: 'W', move: 60, exercise: 50, stand: 45 },
+                        { day: 'T', move: 85, exercise: 100, stand: 80 },
+                        { day: 'F', move: 110, exercise: 120, stand: 95 },
+                        { day: 'S', move: 120, exercise: 130, stand: 100 },
+                        { day: 'S', move: 90, exercise: 85, stand: 75 }
+                      ].map((item, idx) => (
+                        <div key={idx} className="trend-column">
+                          <div className="trend-bars-stacked">
+                            <div className="trend-bar" style={{ height: `${item.move}%`, background: 'var(--color-move)' }}></div>
+                            <div className="trend-bar" style={{ height: `${item.exercise}%`, background: 'var(--color-exercise)' }}></div>
+                            <div className="trend-bar" style={{ height: `${item.stand}%`, background: 'var(--color-stand)' }}></div>
+                          </div>
+                          <span className="trend-label">{item.day}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Lifetime Statistics */}
                   <div className="glass-panel" style={{ padding: '16px', textAlign: 'left' }}>
                     <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
@@ -1679,6 +1908,45 @@ export default function App() {
                       <div className="profile-stat-box">
                         <span style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>WORKOUTS</span>
                         <span className="profile-stat-val" style={{ color: 'var(--color-stairs)' }}>{workoutLogs.length}</span>
+                      </div>
+                    </div>
+
+                    {/* Goal Configuration inside Profile Details Modal */}
+                    <div style={{ width: '100%', borderTop: '1px solid var(--border-light)', paddingTop: '16px', textAlign: 'left' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
+                        Edit Daily Targets
+                      </span>
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>MOVE (KCAL)</span>
+                          <input 
+                            type="number" 
+                            value={goals.move} 
+                            onChange={e => setGoals(prev => ({ ...prev, move: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                            className="auth-input" 
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>EXERCISE (MIN)</span>
+                          <input 
+                            type="number" 
+                            value={goals.exercise} 
+                            onChange={e => setGoals(prev => ({ ...prev, exercise: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                            className="auth-input" 
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          />
+                        </div>
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>STAND (HRS)</span>
+                          <input 
+                            type="number" 
+                            value={goals.stand} 
+                            onChange={e => setGoals(prev => ({ ...prev, stand: Math.max(1, parseInt(e.target.value, 10) || 1) }))}
+                            className="auth-input" 
+                            style={{ padding: '6px 10px', fontSize: '12px' }}
+                          />
+                        </div>
                       </div>
                     </div>
 
