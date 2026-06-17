@@ -10,6 +10,7 @@ import {
   onAuthStateChanged,
   signInWithPopup
 } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 // Firebase configuration loaded from Vite environment variables.
 // Fallback values prevent the app from crashing on start if keys are not yet configured.
@@ -25,6 +26,7 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+const db = getFirestore(app);
 
 // Authentication Providers
 const googleProvider = new GoogleAuthProvider();
@@ -43,5 +45,7 @@ export {
   updateProfile,
   signOut,
   onAuthStateChanged,
-  signInWithPopup
+  signInWithPopup,
+  db
 };
+
