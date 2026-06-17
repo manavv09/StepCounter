@@ -1262,3 +1262,34 @@ body {
   font-weight: 600;
 }
 
+/* ==========================================
+   LIVE REAL-TIME WATCH SIMULATION STYLING
+   ========================================== */
+.live-pulse-dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-exercise);
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 8px var(--color-exercise);
+  animation: live-dot-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes live-dot-pulse {
+  0% { transform: scale(0.9); opacity: 0.5; box-shadow: 0 0 0 0 rgba(0, 249, 104, 0.4); }
+  50% { transform: scale(1.1); opacity: 1; box-shadow: 0 0 8px 3px rgba(0, 249, 104, 0.4); }
+  100% { transform: scale(0.9); opacity: 0.5; box-shadow: 0 0 0 0 rgba(0, 249, 104, 0); }
+}
+
+.live-tracker-bar {
+  background: linear-gradient(90deg, rgba(28, 28, 30, 0.65) 0%, rgba(10, 10, 12, 0.75) 100%) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  margin-top: 4px;
+}
+
+.live-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: var(--text-primary) !important;
+}
+
+
