@@ -1292,4 +1292,26 @@ body {
   color: var(--text-primary) !important;
 }
 
+/* Goals Editor Responsive Grid */
+.goals-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.goals-editor-grid input {
+  width: 100% !important;
+  min-width: 0 !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 600px) {
+  .goals-editor-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
 
