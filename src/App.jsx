@@ -16,7 +16,8 @@ import {
   Minus, 
   Info,
   ChevronRight,
-  TrendingDown
+  TrendingDown,
+  AlertTriangle
 } from 'lucide-react';
 import {
   auth,
@@ -138,6 +139,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : { name: 'John Doe', email: 'john@example.com', isLoggedIn: true };
   });
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [authMode, setAuthMode] = useState('login'); // login, signup
   const [authEmail, setAuthEmail] = useState('');
   const [authPassword, setAuthPassword] = useState('');
@@ -528,7 +530,7 @@ export default function App() {
 
   // Disable body scroll when modal is open or active workout session is running
   useEffect(() => {
-    if (showProfileModal || activeSession) {
+    if (showProfileModal || activeSession || showResetConfirm) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
@@ -536,7 +538,7 @@ export default function App() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [showProfileModal, activeSession]);
+  }, [showProfileModal, activeSession, showResetConfirm]);
 
   // Update hourly charts dynamically when steps update
   useEffect(() => {
@@ -927,15 +929,25 @@ export default function App() {
 
   // Reset all current progress
   const resetDailyProgress = () => {
-    if (confirm('Are you sure you want to reset your daily counter?')) {
-      setSteps(0);
-      setStairsUp(0);
-      setStairsDown(0);
-      setWorkoutCalories(0);
-      setWorkoutMinutes(0);
-      setWorkoutLogs([]);
-      localStorage.clear();
+    setShowResetConfirm(true);
+  };
+
+  const handleConfirmReset = () => {
+    setSteps(0);
+    setStairsUp(0);
+    setStairsDown(0);
+    setWorkoutCalories(0);
+    setWorkoutMinutes(0);
+    setWorkoutLogs([]);
+    
+    // Preserve logged-in user in localStorage while resetting stats
+    const currentUser = localStorage.getItem('fit_user');
+    localStorage.clear();
+    if (currentUser) {
+      localStorage.setItem('fit_user', currentUser);
     }
+    
+    setShowResetConfirm(false);
   };
 
   // BMI Calculation
@@ -2253,6 +2265,74 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* Custom Clear/Reset Confirmation Modal */}
+          {showResetConfirm && (
+            <div className="modal-overlay" onClick={() => setShowResetConfirm(false)}>
+              <div className="glass-panel modal-card fade-in" style={{ maxWidth: '380px', textAlign: 'center', padding: '24px' }} onClick={e => e.stopPropagation()}>
+                <div style={{ 
+                  width: '56px', 
+                  height: '56px', 
+                  borderRadius: '50%', 
+                  background: 'rgba(255, 69, 58, 0.15)', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center', 
+                  margin: '0 auto 16px auto',
+                  color: '#ff453a'
+                }}>
+                  <AlertTriangle size={28} />
+                </div>
+                
+                <h3 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '8px', fontFamily: 'var(--font-display)' }}>
+                  Clear All Data?
+                </h3>
+                
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5', marginBottom: '24px' }}>
+                  This will permanently reset your daily steps, stairs climbed, calorie logs, and active workout history. This action cannot be undone.
+                </p>
+                
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button 
+                    onClick={() => setShowResetConfirm(false)}
+                    style={{
+                      flex: 1,
+                      background: 'rgba(255, 255, 255, 0.08)',
+                      color: '#fff',
+                      border: '1px solid var(--border-light)',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  
+                  <button 
+                    onClick={handleConfirmReset}
+                    style={{
+                      flex: 1,
+                      background: 'linear-gradient(135deg, #ff1b55, #ff5e3a)',
+                      color: '#fff',
+                      border: 'none',
+                      padding: '12px',
+                      borderRadius: '12px',
+                      fontWeight: 'bold',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      boxShadow: '0 4px 15px rgba(255, 27, 85, 0.3)',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    Clear Data
+                  </button>
+                </div>
               </div>
             </div>
           )}
