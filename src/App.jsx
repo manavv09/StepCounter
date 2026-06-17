@@ -1485,7 +1485,7 @@ export default function App() {
                     </div>
 
                     {showGoalsEditor && (
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', animation: 'fadeIn 0.2s' }}>
+                      <div className="goals-editor-grid" style={{ marginBottom: '16px', background: 'rgba(0,0,0,0.15)', padding: '10px', borderRadius: '8px', animation: 'fadeIn 0.2s' }}>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
                           <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>MOVE (KCAL)</span>
                           <input 
@@ -2126,7 +2126,7 @@ export default function App() {
                       <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '10px' }}>
                         Edit Daily Targets
                       </span>
-                      <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                      <div className="goals-editor-grid" style={{ marginBottom: '14px' }}>
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           <span style={{ fontSize: '9px', color: 'var(--text-secondary)', fontWeight: 'bold' }}>MOVE (KCAL)</span>
                           <input 
