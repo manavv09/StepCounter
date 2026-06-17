@@ -1,8 +1,8 @@
 # Apple Fitness+ Interactive Step & Workout Tracker
 
-[![Vercel Deployment](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://step-counter-30fqjjhi6-manav-bhartis-projects.vercel.app)
+[![Vercel Deployment](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://step-counter-taupe-beta.vercel.app/)
 
-🔗 **Live Demo:** [step-counter-30fqjjhi6-manav-bhartis-projects.vercel.app](https://step-counter-30fqjjhi6-manav-bhartis-projects.vercel.app)
+🔗 **Live Demo:** [step-counter-taupe-beta.vercel.app](https://step-counter-taupe-beta.vercel.app/)
 
 A premium React Single Page Application (SPA) designed to replicate the aesthetics and interactiveness of **Apple Fitness**. Featuring dark-themed glassmorphism panels, animated SVG activity rings, step & stair climbing simulation, live sports logging, calculators, and interactive multi-device layout simulators.
 
