@@ -17,7 +17,13 @@ import {
   Info,
   ChevronRight,
   TrendingDown,
-  AlertTriangle
+  AlertTriangle,
+  Moon,
+  Send,
+  Smile,
+  Wind,
+  Users,
+  Share2
 } from 'lucide-react';
 import {
   auth,
@@ -133,6 +139,57 @@ export default function App() {
   const [calorieInput, setCalorieInput] = useState({ goal: 'loss', weight: '', activity: '1.2' });
   const [calorieResult, setCalorieResult] = useState(null);
 
+  // Sleep & Recovery states
+  const [sleepLogs, setSleepLogs] = useState(() => {
+    const saved = getSavedMetric('sleep_logs', '[]');
+    const parsed = JSON.parse(saved);
+    return parsed.length > 0 ? parsed : [
+      {
+        id: Date.now() - 86400000 * 2,
+        date: new Date(Date.now() - 86400000 * 2).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        bedTime: '22:45',
+        wakeTime: '07:00',
+        duration: 8.2,
+        score: 87,
+        stages: { awake: 0.6, rem: 1.8, core: 4.3, deep: 1.5 },
+        quality: 'excellent'
+      },
+      {
+        id: Date.now() - 86400000,
+        date: new Date(Date.now() - 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        bedTime: '23:30',
+        wakeTime: '06:45',
+        duration: 7.2,
+        score: 74,
+        stages: { awake: 0.9, rem: 1.4, core: 3.9, deep: 1.0 },
+        quality: 'good'
+      }
+    ];
+  });
+  const [sleepGoal, setSleepGoal] = useState(() => parseFloat(getSavedMetric('sleep_goal', '8.0')));
+  const [sleepInput, setSleepInput] = useState({ bedTime: '23:00', wakeTime: '07:00', quality: 'good' });
+
+  // Social sharing / Leaderboard friends
+  const [friends, setFriends] = useState(() => {
+    const saved = getSavedMetric('friends', '[]');
+    const parsed = JSON.parse(saved);
+    return parsed.length > 0 ? parsed : [
+      { name: 'Sarah Connor', steps: 8400, calories: 420, activeRings: { move: 0.8, exercise: 0.7, stand: 0.9 } },
+      { name: 'Alex Mercer', steps: 11200, calories: 580, activeRings: { move: 1.15, exercise: 1.2, stand: 0.8 } },
+      { name: 'Emily Thorne', steps: 4300, calories: 210, activeRings: { move: 0.45, exercise: 0.35, stand: 0.5 } }
+    ];
+  });
+
+  // App-wide toast notifications
+  const [toasts, setToasts] = useState([]);
+  const showToast = (message, icon = '🔔') => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, icon }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 3000);
+  };
+
   // User Profile & Authentication States
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('fit_user');
@@ -199,6 +256,40 @@ export default function App() {
 
     const savedGoals = localStorage.getItem(`fit_${keyPrefix}_goals`);
     setGoals(savedGoals ? JSON.parse(savedGoals) : { move: 500, exercise: 30, stand: 12 });
+
+    const savedSleepLogs = localStorage.getItem(`fit_${keyPrefix}_sleep_logs`);
+    setSleepLogs(savedSleepLogs ? JSON.parse(savedSleepLogs) : [
+      {
+        id: Date.now() - 86400000 * 2,
+        date: new Date(Date.now() - 86400000 * 2).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        bedTime: '22:45',
+        wakeTime: '07:00',
+        duration: 8.2,
+        score: 87,
+        stages: { awake: 0.6, rem: 1.8, core: 4.3, deep: 1.5 },
+        quality: 'excellent'
+      },
+      {
+        id: Date.now() - 86400000,
+        date: new Date(Date.now() - 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        bedTime: '23:30',
+        wakeTime: '06:45',
+        duration: 7.2,
+        score: 74,
+        stages: { awake: 0.9, rem: 1.4, core: 3.9, deep: 1.0 },
+        quality: 'good'
+      }
+    ]);
+
+    const savedSleepGoal = localStorage.getItem(`fit_${keyPrefix}_sleep_goal`);
+    setSleepGoal(savedSleepGoal ? parseFloat(savedSleepGoal) : 8.0);
+
+    const savedFriends = localStorage.getItem(`fit_${keyPrefix}_friends`);
+    setFriends(savedFriends ? JSON.parse(savedFriends) : [
+      { name: 'Sarah Connor', steps: 8400, calories: 420, activeRings: { move: 0.8, exercise: 0.7, stand: 0.9 } },
+      { name: 'Alex Mercer', steps: 11200, calories: 580, activeRings: { move: 1.15, exercise: 1.2, stand: 0.8 } },
+      { name: 'Emily Thorne', steps: 4300, calories: 210, activeRings: { move: 0.45, exercise: 0.35, stand: 0.5 } }
+    ]);
   }, [user.email, user.isLoggedIn]);
 
   // Save user-scoped metrics on state changes
@@ -214,8 +305,11 @@ export default function App() {
       localStorage.setItem(`fit_${keyPrefix}_workout_logs`, JSON.stringify(workoutLogs));
       localStorage.setItem(`fit_${keyPrefix}_water_intake`, waterIntake);
       localStorage.setItem(`fit_${keyPrefix}_goals`, JSON.stringify(goals));
+      localStorage.setItem(`fit_${keyPrefix}_sleep_logs`, JSON.stringify(sleepLogs));
+      localStorage.setItem(`fit_${keyPrefix}_sleep_goal`, sleepGoal);
+      localStorage.setItem(`fit_${keyPrefix}_friends`, JSON.stringify(friends));
     }
-  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, workoutLogs, waterIntake, goals, user]);
+  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, workoutLogs, waterIntake, goals, user, sleepLogs, sleepGoal, friends]);
 
   useEffect(() => {
     localStorage.setItem('fit_user', JSON.stringify(user));
@@ -287,6 +381,9 @@ export default function App() {
         if (data.waterIntake !== undefined && data.waterIntake !== waterIntake) setWaterIntake(data.waterIntake);
         if (data.goals !== undefined && JSON.stringify(data.goals) !== JSON.stringify(goals)) setGoals(data.goals);
         if (data.workoutLogs !== undefined && JSON.stringify(data.workoutLogs) !== JSON.stringify(workoutLogs)) setWorkoutLogs(data.workoutLogs);
+        if (data.sleepLogs !== undefined && JSON.stringify(data.sleepLogs) !== JSON.stringify(sleepLogs)) setSleepLogs(data.sleepLogs);
+        if (data.sleepGoal !== undefined && data.sleepGoal !== sleepGoal) setSleepGoal(data.sleepGoal);
+        if (data.friends !== undefined && JSON.stringify(data.friends) !== JSON.stringify(friends)) setFriends(data.friends);
         
         setSyncStatus('synced');
       } else {
@@ -298,7 +395,10 @@ export default function App() {
           workoutMinutes,
           waterIntake,
           goals,
-          workoutLogs
+          workoutLogs,
+          sleepLogs,
+          sleepGoal,
+          friends
         }, { merge: true })
         .then(() => setSyncStatus('synced'))
         .catch(err => {
@@ -327,7 +427,10 @@ export default function App() {
       workoutMinutes !== lastSyncRef.current.workoutMinutes ||
       waterIntake !== lastSyncRef.current.waterIntake ||
       JSON.stringify(goals) !== JSON.stringify(lastSyncRef.current.goals) ||
-      JSON.stringify(workoutLogs) !== JSON.stringify(lastSyncRef.current.workoutLogs);
+      JSON.stringify(workoutLogs) !== JSON.stringify(lastSyncRef.current.workoutLogs) ||
+      JSON.stringify(sleepLogs) !== JSON.stringify(lastSyncRef.current.sleepLogs) ||
+      sleepGoal !== lastSyncRef.current.sleepGoal ||
+      JSON.stringify(friends) !== JSON.stringify(lastSyncRef.current.friends);
 
     if (!hasChanges) return;
 
@@ -343,7 +446,10 @@ export default function App() {
         workoutMinutes,
         waterIntake,
         goals,
-        workoutLogs
+        workoutLogs,
+        sleepLogs,
+        sleepGoal,
+        friends
       }, { merge: true })
       .then(() => {
         setSyncStatus('synced');
@@ -355,7 +461,10 @@ export default function App() {
           workoutMinutes,
           waterIntake,
           goals,
-          workoutLogs
+          workoutLogs,
+          sleepLogs,
+          sleepGoal,
+          friends
         };
       })
       .catch((err) => {
@@ -365,7 +474,7 @@ export default function App() {
     }, 1200);
 
     return () => clearTimeout(syncTimeout);
-  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, waterIntake, goals, workoutLogs, user.email, user.isLoggedIn]);
+  }, [steps, stairsUp, stairsDown, workoutCalories, workoutMinutes, waterIntake, goals, workoutLogs, sleepLogs, sleepGoal, friends, user.email, user.isLoggedIn]);
 
   const handleAuthSubmit = async (e) => {
     e.preventDefault();
@@ -678,6 +787,8 @@ export default function App() {
     { type: 'Tennis', icon: '🎾', color: 'linear-gradient(135deg, #aa3bff, #ff0055)', baseHeartRate: 130, calorieBurnRate: 7.5 },
     { type: 'Cycling', icon: '🚴', color: 'linear-gradient(135deg, #30d158, #00f968)', baseHeartRate: 125, calorieBurnRate: 8.5 },
     { type: 'Yoga', icon: '🧘', color: 'linear-gradient(135deg, #bf5af2, #ff5e3a)', baseHeartRate: 95, calorieBurnRate: 3.5 },
+    { type: 'Mindfulness Breathing', icon: '🌬️', color: 'linear-gradient(135deg, #00d2ff, #5e5ce6)', baseHeartRate: 65, calorieBurnRate: 1.5 },
+    { type: 'State of Mind Reflection', icon: '💭', color: 'linear-gradient(135deg, #bf5af2, #5e5ce6)', baseHeartRate: 65, calorieBurnRate: 1.0 }
   ];
 
   // Session-specific simulation triggers
@@ -794,13 +905,66 @@ export default function App() {
       swings: 0,
       laps: 0,
       breaths: 0,
-      heartRateHistory: [workout.baseHeartRate]
+      heartRateHistory: [workout.baseHeartRate],
+      breathPhase: 'inhale',
+      breathTimer: 4,
+      breathCycles: 0,
+      loggedMood: 'neutral',
+      loggedFeelings: []
     });
 
     sessionTimerRef.current = setInterval(() => {
       setActiveSession(prev => {
         if (!prev) return null;
         const nextDuration = prev.duration + 1; // secs
+
+        if (prev.type === 'Mindfulness Breathing') {
+          let nextPhase = prev.breathPhase || 'inhale';
+          let nextTimer = (prev.breathTimer !== undefined ? prev.breathTimer : 4) - 1;
+          let nextCycles = prev.breathCycles || 0;
+          
+          if (nextTimer <= 0) {
+            nextTimer = 4;
+            if (nextPhase === 'inhale') nextPhase = 'hold-in';
+            else if (nextPhase === 'hold-in') nextPhase = 'exhale';
+            else if (nextPhase === 'exhale') nextPhase = 'hold-out';
+            else if (nextPhase === 'hold-out') {
+              nextPhase = 'inhale';
+              nextCycles += 1;
+            }
+          }
+          
+          const hrOffset = Math.sin(nextDuration / 8) * 2 + (Math.random() - 0.5) * 2;
+          const nextHR = Math.round(62 + hrOffset);
+          const nextCalories = Math.round((nextDuration / 60) * prev.calorieBurnRate);
+          const history = prev.heartRateHistory ? [...prev.heartRateHistory, nextHR] : [nextHR];
+          if (history.length > 15) history.shift();
+          
+          return {
+            ...prev,
+            duration: nextDuration,
+            heartRate: nextHR,
+            calories: nextCalories,
+            heartRateHistory: history,
+            breathPhase: nextPhase,
+            breathTimer: nextTimer,
+            breathCycles: nextCycles
+          };
+        } else if (prev.type === 'State of Mind Reflection') {
+          const hrOffset = Math.sin(nextDuration / 8) * 2 + (Math.random() - 0.5) * 2;
+          const nextHR = Math.round(65 + hrOffset);
+          const nextCalories = Math.round((nextDuration / 60) * prev.calorieBurnRate);
+          const history = prev.heartRateHistory ? [...prev.heartRateHistory, nextHR] : [nextHR];
+          if (history.length > 15) history.shift();
+          
+          return {
+            ...prev,
+            duration: nextDuration,
+            heartRate: nextHR,
+            calories: nextCalories,
+            heartRateHistory: history
+          };
+        }
         
         // Realistic fluctuating heart rate
         const hrOffset = Math.sin(nextDuration / 5) * 5 + (Math.random() - 0.5) * 4;
@@ -847,6 +1011,55 @@ export default function App() {
       setActiveSession(prev => {
         if (!prev) return null;
         const nextDuration = prev.duration + 1; // secs
+
+        if (prev.type === 'Mindfulness Breathing') {
+          let nextPhase = prev.breathPhase || 'inhale';
+          let nextTimer = (prev.breathTimer !== undefined ? prev.breathTimer : 4) - 1;
+          let nextCycles = prev.breathCycles || 0;
+          
+          if (nextTimer <= 0) {
+            nextTimer = 4;
+            if (nextPhase === 'inhale') nextPhase = 'hold-in';
+            else if (nextPhase === 'hold-in') nextPhase = 'exhale';
+            else if (nextPhase === 'exhale') nextPhase = 'hold-out';
+            else if (nextPhase === 'hold-out') {
+              nextPhase = 'inhale';
+              nextCycles += 1;
+            }
+          }
+          
+          const hrOffset = Math.sin(nextDuration / 8) * 2 + (Math.random() - 0.5) * 2;
+          const nextHR = Math.round(62 + hrOffset);
+          const nextCalories = Math.round((nextDuration / 60) * prev.calorieBurnRate);
+          const history = prev.heartRateHistory ? [...prev.heartRateHistory, nextHR] : [nextHR];
+          if (history.length > 15) history.shift();
+          
+          return {
+            ...prev,
+            duration: nextDuration,
+            heartRate: nextHR,
+            calories: nextCalories,
+            heartRateHistory: history,
+            breathPhase: nextPhase,
+            breathTimer: nextTimer,
+            breathCycles: nextCycles
+          };
+        } else if (prev.type === 'State of Mind Reflection') {
+          const hrOffset = Math.sin(nextDuration / 8) * 2 + (Math.random() - 0.5) * 2;
+          const nextHR = Math.round(65 + hrOffset);
+          const nextCalories = Math.round((nextDuration / 60) * prev.calorieBurnRate);
+          const history = prev.heartRateHistory ? [...prev.heartRateHistory, nextHR] : [nextHR];
+          if (history.length > 15) history.shift();
+          
+          return {
+            ...prev,
+            duration: nextDuration,
+            heartRate: nextHR,
+            calories: nextCalories,
+            heartRateHistory: history
+          };
+        }
+
         const hrOffset = Math.sin(nextDuration / 5) * 5 + (Math.random() - 0.5) * 4;
         const nextHR = Math.round(prev.baseHeartRate + hrOffset);
         
@@ -906,6 +1119,10 @@ export default function App() {
         customMetricText = `${activeSession.stairsUp || 0} F Up / ${activeSession.stairsDown || 0} F Dn`;
       } else if (activeSession.type === 'Yoga') {
         customMetricText = `${activeSession.breaths || 0} deep breaths`;
+      } else if (activeSession.type === 'Mindfulness Breathing') {
+        customMetricText = `${activeSession.breathCycles || 0} cycles completed`;
+      } else if (activeSession.type === 'State of Mind Reflection') {
+        customMetricText = `Mood: ${activeSession.loggedMood === 'very-pleasant' ? 'Very Pleasant' : activeSession.loggedMood === 'pleasant' ? 'Pleasant' : activeSession.loggedMood === 'neutral' ? 'Neutral' : activeSession.loggedMood === 'unpleasant' ? 'Unpleasant' : 'Very Unpleasant'} (${(activeSession.loggedFeelings || []).join(', ') || 'Calm'})`;
       } else {
         customMetricText = 'Completed';
       }
@@ -922,6 +1139,7 @@ export default function App() {
       };
 
       setWorkoutLogs(prev => [log, ...prev]);
+      showToast(`Completed ${activeSession.type}!`, '✅');
     }
     setActiveSession(null);
     setIsPaused(false);
@@ -939,6 +1157,34 @@ export default function App() {
     setWorkoutCalories(0);
     setWorkoutMinutes(0);
     setWorkoutLogs([]);
+    setWaterIntake(0);
+    setSleepLogs([
+      {
+        id: Date.now() - 86400000 * 2,
+        date: new Date(Date.now() - 86400000 * 2).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        bedTime: '22:45',
+        wakeTime: '07:00',
+        duration: 8.2,
+        score: 87,
+        stages: { awake: 0.6, rem: 1.8, core: 4.3, deep: 1.5 },
+        quality: 'excellent'
+      },
+      {
+        id: Date.now() - 86400000,
+        date: new Date(Date.now() - 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        bedTime: '23:30',
+        wakeTime: '06:45',
+        duration: 7.2,
+        score: 74,
+        stages: { awake: 0.9, rem: 1.4, core: 3.9, deep: 1.0 },
+        quality: 'good'
+      }
+    ]);
+    setFriends([
+      { name: 'Sarah Connor', steps: 8400, calories: 420, activeRings: { move: 0.8, exercise: 0.7, stand: 0.9 } },
+      { name: 'Alex Mercer', steps: 11200, calories: 580, activeRings: { move: 1.15, exercise: 1.2, stand: 0.8 } },
+      { name: 'Emily Thorne', steps: 4300, calories: 210, activeRings: { move: 0.45, exercise: 0.35, stand: 0.5 } }
+    ]);
     
     // Preserve logged-in user in localStorage while resetting stats
     const currentUser = localStorage.getItem('fit_user');
@@ -948,6 +1194,7 @@ export default function App() {
     }
     
     setShowResetConfirm(false);
+    showToast("All fitness data has been reset.", "🗑️");
   };
 
   // BMI Calculation
@@ -995,6 +1242,133 @@ export default function App() {
     }
   };
 
+  // Sleep Logger Action
+  const logSleepSession = (e) => {
+    e.preventDefault();
+    const bed = sleepInput.bedTime; // "HH:MM"
+    const wake = sleepInput.wakeTime; // "HH:MM"
+    
+    // Parse times
+    const [bedH, bedM] = bed.split(':').map(Number);
+    const [wakeH, wakeM] = wake.split(':').map(Number);
+    
+    let durationMins = (wakeH * 60 + wakeM) - (bedH * 60 + bedM);
+    if (durationMins < 0) durationMins += 24 * 60; // crossed midnight
+    
+    const durationHours = parseFloat((durationMins / 60).toFixed(1));
+    
+    // Distribute stages based on quality and duration
+    let pctDeep = 0.18;
+    let pctRem = 0.22;
+    let pctCore = 0.52;
+    let pctAwake = 0.08;
+    
+    if (sleepInput.quality === 'excellent') {
+      pctDeep = 0.23;
+      pctRem = 0.25;
+      pctCore = 0.47;
+      pctAwake = 0.05;
+    } else if (sleepInput.quality === 'poor') {
+      pctDeep = 0.10;
+      pctRem = 0.15;
+      pctCore = 0.55;
+      pctAwake = 0.20;
+    }
+    
+    const awakeHrs = parseFloat((durationHours * pctAwake).toFixed(1));
+    const remHrs = parseFloat((durationHours * pctRem).toFixed(1));
+    const coreHrs = parseFloat((durationHours * pctCore).toFixed(1));
+    const deepHrs = parseFloat((durationHours * pctDeep).toFixed(1));
+    
+    // Calculate sleep score out of 100
+    const durationScore = Math.min(50, (durationHours / sleepGoal) * 50);
+    const deepScore = Math.min(25, (deepHrs / (sleepGoal * 0.15)) * 25);
+    const awakeScore = Math.max(0, 25 - (awakeHrs * 12));
+    const score = Math.round(durationScore + deepScore + awakeScore);
+    
+    const newLog = {
+      id: Date.now(),
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      bedTime: bed,
+      wakeTime: wake,
+      duration: durationHours,
+      score,
+      stages: {
+        awake: awakeHrs,
+        rem: remHrs,
+        core: coreHrs,
+        deep: deepHrs
+      },
+      quality: sleepInput.quality
+    };
+    
+    setSleepLogs(prev => [newLog, ...prev]);
+    showToast(`Logged ${durationHours}h sleep (Score: ${score})`, '🌙');
+  };
+
+  // Social Sharing Actions
+  const handleCheer = (name) => {
+    const responses = [
+      "Thanks, let's crush our goals today! 👍",
+      "Wooo! Together we've got this! 🙌",
+      "Appreciate it! Ring completion is imminent! ⚡",
+      "Just finished a quick run, thanks! 🏃‍♀️"
+    ];
+    const reply = responses[Math.floor(Math.random() * responses.length)];
+    showToast(`Cheered ${name.split(' ')[0]}!`, '📣');
+    setTimeout(() => {
+      showToast(`${name.split(' ')[0]}: "${reply}"`, '💬');
+    }, 1200);
+  };
+
+  const handleNudge = (name) => {
+    const responses = [
+      "On it! Going for a walk right now! 🚶",
+      "Oops, I'm slacking today! Getting up! ⚡",
+      "Challenge accepted! Watch me catch up! 🏆",
+      "My watch just yelled at me too, haha! ⌚"
+    ];
+    const reply = responses[Math.floor(Math.random() * responses.length)];
+    showToast(`Nudged ${name.split(' ')[0]} to stand!`, '🔔');
+    setTimeout(() => {
+      showToast(`${name.split(' ')[0]}: "${reply}"`, '💬');
+    }, 1200);
+  };
+
+  const handleAddFriend = (e) => {
+    e.preventDefault();
+    const input = document.getElementById('invite-friend-name');
+    if (!input) return;
+    const name = input.value.trim();
+    if (!name) return;
+    
+    if (friends.some(f => f.name.toLowerCase() === name.toLowerCase())) {
+      showToast(`${name} is already in your sharing list!`, '⚠️');
+      return;
+    }
+
+    const randRings = {
+      move: parseFloat((Math.random() * 1.2 + 0.3).toFixed(2)),
+      exercise: parseFloat((Math.random() * 1.2 + 0.3).toFixed(2)),
+      stand: parseFloat((Math.random() * 1.1 + 0.4).toFixed(2))
+    };
+    
+    const newFriend = {
+      name,
+      steps: Math.floor(Math.random() * 9000) + 2000,
+      calories: Math.floor(Math.random() * 500) + 150,
+      activeRings: randRings
+    };
+    
+    setFriends(prev => [...prev, newFriend]);
+    showToast(`Sent sharing request to ${name}!`, '✉️');
+    input.value = '';
+    
+    setTimeout(() => {
+      showToast(`${name} accepted sharing request!`, '✅');
+    }, 2000);
+  };
+
   // Determine achievement achievements unlocked
   const checkUnlockedBadges = () => {
     return {
@@ -1039,105 +1413,212 @@ export default function App() {
             </div>
           </div>
 
-              <div className="session-stats-grid">
-                <div className="session-stat">
-                  <span className="session-stat-label">Active Calories</span>
-                  <span className="session-stat-value" style={{ color: 'var(--color-move)' }}>
-                    {activeSession.calories} <span style={{ fontSize: '12px' }}>kcal</span>
-                  </span>
-                </div>
-                
-                <div className="session-stat">
-                  <span className="session-stat-label">Heart Rate</span>
-                  <span className="session-stat-value" style={{ color: '#ff453a', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <Heart size={16} className="pulse" fill="#ff453a" /> {activeSession.heartRate} <span style={{ fontSize: '12px' }}>bpm</span>
-                  </span>
-                </div>
-
-                {/* Walking, Running, Stair Climbing steps and distance */}
-                {['Running', 'Walking', 'Stair Climbing'].includes(activeSession.type) && (
-                  <>
-                    <div className="session-stat">
-                      <span className="session-stat-label">Steps</span>
-                      <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
-                        {activeSession.steps || 0}
+              {/* Mindfulness Breathing session view */}
+              {activeSession.type === 'Mindfulness Breathing' && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '340px' }}>
+                  <div className="breathing-bubble-container">
+                    <div className={`breathing-bubble ${activeSession.breathPhase || 'inhale'}`}>
+                      {activeSession.breathPhase === 'inhale' && 'Inhale'}
+                      {activeSession.breathPhase === 'hold-in' && 'Hold'}
+                      {activeSession.breathPhase === 'exhale' && 'Exhale'}
+                      {activeSession.breathPhase === 'hold-out' && 'Hold'}
+                    </div>
+                    <div className="breathing-cycle-indicator">
+                      Cycles Completed: {activeSession.breathCycles || 0}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: '12px', width: '100%', marginTop: '10px' }}>
+                    <div className="session-stat" style={{ flex: 1 }}>
+                      <span className="session-stat-label">Active Calories</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-move)' }}>
+                        {activeSession.calories} <span style={{ fontSize: '12px' }}>kcal</span>
                       </span>
                     </div>
-                    <div className="session-stat">
+                    <div className="session-stat" style={{ flex: 1 }}>
+                      <span className="session-stat-label">Heart Rate</span>
+                      <span className="session-stat-value" style={{ color: '#ff453a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Heart size={16} className="pulse" fill="#ff453a" /> {activeSession.heartRate} <span style={{ fontSize: '12px' }}>bpm</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* State of Mind Reflection session view */}
+              {activeSession.type === 'State of Mind Reflection' && (
+                <div className="reflection-aura-panel">
+                  <div className={`reflection-aura-glow ${activeSession.loggedMood || 'neutral'}`}></div>
+                  <div className="reflection-content">
+                    <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#fff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      State of Mind Log
+                    </span>
+                    <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+                      How are you feeling right now?
+                    </span>
+                    
+                    <div className="mood-selector">
+                      {[
+                        { val: 'very-unpleasant', emoji: '🥱', label: 'Very Unpleasant' },
+                        { val: 'unpleasant', emoji: '😕', label: 'Unpleasant' },
+                        { val: 'neutral', emoji: '😐', label: 'Neutral' },
+                        { val: 'pleasant', emoji: '😊', label: 'Pleasant' },
+                        { val: 'very-pleasant', emoji: '😃', label: 'Very Pleasant' }
+                      ].map(mood => (
+                        <button 
+                          key={mood.val} 
+                          className={`mood-btn ${activeSession.loggedMood === mood.val ? 'active' : ''}`}
+                          onClick={() => setActiveSession(prev => ({ ...prev, loggedMood: mood.val }))}
+                        >
+                          <span className="mood-emoji">{mood.emoji}</span>
+                          <span className="mood-text">{mood.label.split(' ')[0]}</span>
+                        </button>
+                      ))}
+                    </div>
+
+                    <span style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '8px', textAlign: 'left', fontWeight: 'bold' }}>
+                      SELECT SPECIFIC FEELINGS:
+                    </span>
+                    <div className="feeling-tags-container">
+                      {[
+                        'Calm', 'Grateful', 'Anxious', 'Stressed', 'Excited', 
+                        'Peaceful', 'Irritated', 'Tired', 'Happy', 'Focused'
+                      ].map(tag => {
+                        const activeFeelings = activeSession.loggedFeelings || [];
+                        const isActive = activeFeelings.includes(tag);
+                        return (
+                          <button 
+                            key={tag}
+                            className={`feeling-tag-btn ${isActive ? 'active' : ''}`}
+                            onClick={() => {
+                              const nextFeelings = isActive 
+                                ? activeFeelings.filter(f => f !== tag)
+                                : [...activeFeelings, tag];
+                              setActiveSession(prev => ({ ...prev, loggedFeelings: nextFeelings }));
+                            }}
+                          >
+                            {tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div style={{ width: '100%', display: 'flex', gap: '12px', zIndex: 3, marginTop: '20px' }}>
+                    <div className="session-stat" style={{ flex: 1 }}>
+                      <span className="session-stat-label">Duration</span>
+                      <span className="session-stat-value">{Math.floor(activeSession.duration / 60).toString().padStart(2, '0')}:{(activeSession.duration % 60).toString().padStart(2, '0')}</span>
+                    </div>
+                    <div className="session-stat" style={{ flex: 1 }}>
+                      <span className="session-stat-label">Active HR</span>
+                      <span className="session-stat-value" style={{ color: '#ff453a' }}>{activeSession.heartRate} bpm</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Standard active session stats grid */}
+              {!['Mindfulness Breathing', 'State of Mind Reflection'].includes(activeSession.type) && (
+                <div className="session-stats-grid">
+                  <div className="session-stat">
+                    <span className="session-stat-label">Active Calories</span>
+                    <span className="session-stat-value" style={{ color: 'var(--color-move)' }}>
+                      {activeSession.calories} <span style={{ fontSize: '12px' }}>kcal</span>
+                    </span>
+                  </div>
+                  
+                  <div className="session-stat">
+                    <span className="session-stat-label">Heart Rate</span>
+                    <span className="session-stat-value" style={{ color: '#ff453a', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Heart size={16} className="pulse" fill="#ff453a" /> {activeSession.heartRate} <span style={{ fontSize: '12px' }}>bpm</span>
+                    </span>
+                  </div>
+
+                  {/* Walking, Running, Stair Climbing steps and distance */}
+                  {['Running', 'Walking', 'Stair Climbing'].includes(activeSession.type) && (
+                    <>
+                      <div className="session-stat">
+                        <span className="session-stat-label">Steps</span>
+                        <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
+                          {activeSession.steps || 0}
+                        </span>
+                      </div>
+                      <div className="session-stat">
+                        <span className="session-stat-label">Distance</span>
+                        <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                          {activeSession.distance || 0} <span style={{ fontSize: '12px' }}>km</span>
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Stair Climbing vertical floors */}
+                  {activeSession.type === 'Stair Climbing' && (
+                    <>
+                      <div className="session-stat">
+                        <span className="session-stat-label">Stairs Up</span>
+                        <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
+                          {activeSession.stairsUp || 0} <span style={{ fontSize: '11px' }}>F</span>
+                        </span>
+                      </div>
+                      <div className="session-stat">
+                        <span className="session-stat-label">Stairs Dn</span>
+                        <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                          {activeSession.stairsDown || 0} <span style={{ fontSize: '11px' }}>F</span>
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Swimming details */}
+                  {activeSession.type === 'Swimming' && (
+                    <>
+                      <div className="session-stat">
+                        <span className="session-stat-label">Swim Strokes</span>
+                        <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                          {activeSession.strokes || 0}
+                        </span>
+                      </div>
+                      <div className="session-stat">
+                        <span className="session-stat-label">Laps</span>
+                        <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
+                          {activeSession.laps || 0}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* Badminton & Tennis details */}
+                  {['Badminton', 'Tennis'].includes(activeSession.type) && (
+                    <div className="session-stat" style={{ gridColumn: 'span 2' }}>
+                      <span className="session-stat-label">Swings</span>
+                      <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
+                        {activeSession.swings || 0}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Cycling details */}
+                  {activeSession.type === 'Cycling' && (
+                    <div className="session-stat" style={{ gridColumn: 'span 2' }}>
                       <span className="session-stat-label">Distance</span>
                       <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
                         {activeSession.distance || 0} <span style={{ fontSize: '12px' }}>km</span>
                       </span>
                     </div>
-                  </>
-                )}
+                  )}
 
-                {/* Stair Climbing vertical floors */}
-                {activeSession.type === 'Stair Climbing' && (
-                  <>
-                    <div className="session-stat">
-                      <span className="session-stat-label">Stairs Up</span>
-                      <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
-                        {activeSession.stairsUp || 0} <span style={{ fontSize: '11px' }}>F</span>
-                      </span>
-                    </div>
-                    <div className="session-stat">
-                      <span className="session-stat-label">Stairs Dn</span>
+                  {/* Yoga details */}
+                  {activeSession.type === 'Yoga' && (
+                    <div className="session-stat" style={{ gridColumn: 'span 2' }}>
+                      <span className="session-stat-label">Breaths Logged</span>
                       <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
-                        {activeSession.stairsDown || 0} <span style={{ fontSize: '11px' }}>F</span>
+                        {activeSession.breaths || 0}
                       </span>
                     </div>
-                  </>
-                )}
-
-                {/* Swimming details */}
-                {activeSession.type === 'Swimming' && (
-                  <>
-                    <div className="session-stat">
-                      <span className="session-stat-label">Swim Strokes</span>
-                      <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
-                        {activeSession.strokes || 0}
-                      </span>
-                    </div>
-                    <div className="session-stat">
-                      <span className="session-stat-label">Laps</span>
-                      <span className="session-stat-value" style={{ color: 'var(--color-exercise)' }}>
-                        {activeSession.laps || 0}
-                      </span>
-                    </div>
-                  </>
-                )}
-
-                {/* Badminton & Tennis details */}
-                {['Badminton', 'Tennis'].includes(activeSession.type) && (
-                  <div className="session-stat" style={{ gridColumn: 'span 2' }}>
-                    <span className="session-stat-label">Swings</span>
-                    <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
-                      {activeSession.swings || 0}
-                    </span>
-                  </div>
-                )}
-
-                {/* Cycling details */}
-                {activeSession.type === 'Cycling' && (
-                  <div className="session-stat" style={{ gridColumn: 'span 2' }}>
-                    <span className="session-stat-label">Distance</span>
-                    <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
-                      {activeSession.distance || 0} <span style={{ fontSize: '12px' }}>km</span>
-                    </span>
-                  </div>
-                )}
-
-                {/* Yoga details */}
-                {activeSession.type === 'Yoga' && (
-                  <div className="session-stat" style={{ gridColumn: 'span 2' }}>
-                    <span className="session-stat-label">Breaths Logged</span>
-                    <span className="session-stat-value" style={{ color: 'var(--color-stand)' }}>
-                      {activeSession.breaths || 0}
-                    </span>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* Scrolling Heart Rate Line Chart */}
               {(() => {
@@ -1227,146 +1708,148 @@ export default function App() {
               })()}
  
               {/* Session Simulator Panel */}
-              <div className="glass-panel" style={{ width: '100%', maxWidth: '340px', padding: '14px', margin: '15px 0' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
-                    Interactive Session Controls
-                  </span>
-                  
-                  {sensorStatus === 'active' ? (
-                    <span style={{ fontSize: '9px', color: 'var(--color-exercise)', fontWeight: 'bold' }}>📡 SENSOR ACTIVE</span>
-                  ) : (
-                    <button 
-                      onClick={requestSensorPermission} 
-                      style={{
-                        background: 'rgba(255,255,255,0.08)',
-                        color: '#fff',
-                        border: 'none',
-                        padding: '2px 8px',
-                        fontSize: '9px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontWeight: '700'
-                      }}
-                    >
-                      🔗 CONNECT MOBILE SENSOR
-                    </button>
-                  )}
-                </div>
+              {!['Mindfulness Breathing', 'State of Mind Reflection'].includes(activeSession.type) && (
+                <div className="glass-panel" style={{ width: '100%', maxWidth: '340px', padding: '14px', margin: '15px 0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 'bold', color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+                      Interactive Session Controls
+                    </span>
+                    
+                    {sensorStatus === 'active' ? (
+                      <span style={{ fontSize: '9px', color: 'var(--color-exercise)', fontWeight: 'bold' }}>📡 SENSOR ACTIVE</span>
+                    ) : (
+                      <button 
+                        onClick={requestSensorPermission} 
+                        style={{
+                          background: 'rgba(255,255,255,0.08)',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '2px 8px',
+                          fontSize: '9px',
+                          borderRadius: '4px',
+                          cursor: 'pointer',
+                          fontWeight: '700'
+                        }}
+                      >
+                        🔗 CONNECT MOBILE SENSOR
+                      </button>
+                    )}
+                  </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {/* Sport Specific Interactive simulation controls */}
-                  {['Walking', 'Running'].includes(activeSession.type) && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {/* Sport Specific Interactive simulation controls */}
+                    {['Walking', 'Running'].includes(activeSession.type) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button 
+                            className="sim-control-btn" 
+                            style={{ flex: 1, padding: '8px' }} 
+                            onClick={() => handleSessionAddSteps(50)}
+                          >
+                            🚶 Add 50 Steps
+                          </button>
+                          <button 
+                            className="sim-control-btn" 
+                            style={{ flex: 1, padding: '8px' }} 
+                            onClick={() => handleSessionAddSteps(200)}
+                          >
+                            🏃 Add 200 Steps
+                          </button>
+                        </div>
+                        
+                        <button 
+                          className={`auto-sim-btn ${autoSimActive ? 'active' : ''}`}
+                          style={{ padding: '8px', fontSize: '11px' }}
+                          onClick={toggleAutoSim}
+                        >
+                          {autoSimActive ? '⏹ Stop Auto Walk Simulator' : '▶ Start Auto Walk Simulator'}
+                        </button>
+                      </div>
+                    )}
+
+                    {activeSession.type === 'Stair Climbing' && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px', color: 'var(--color-exercise)' }} 
+                          onClick={handleSessionAddStairsUp}
+                        >
+                          🪜 Climb Up +1 Floor
+                        </button>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px', color: 'var(--color-stand)' }} 
+                          onClick={handleSessionAddStairsDown}
+                        >
+                          🪜 Descend -1 Floor
+                        </button>
+                      </div>
+                    )}
+
+                    {activeSession.type === 'Swimming' && (
                       <div style={{ display: 'flex', gap: '6px' }}>
                         <button 
                           className="sim-control-btn" 
                           style={{ flex: 1, padding: '8px' }} 
-                          onClick={() => handleSessionAddSteps(50)}
+                          onClick={() => handleSessionAddStrokes(10)}
                         >
-                          🚶 Add 50 Steps
+                          🏊 Stroke +10
                         </button>
                         <button 
                           className="sim-control-btn" 
-                          style={{ flex: 1, padding: '8px' }} 
-                          onClick={() => handleSessionAddSteps(200)}
+                          style={{ flex: 1, padding: '8px', color: 'var(--color-stand)' }} 
+                          onClick={handleSessionAddLap}
                         >
-                          🏃 Add 200 Steps
+                          🏊 Complete Lap (50m)
                         </button>
                       </div>
-                      
-                      <button 
-                        className={`auto-sim-btn ${autoSimActive ? 'active' : ''}`}
-                        style={{ padding: '8px', fontSize: '11px' }}
-                        onClick={toggleAutoSim}
-                      >
-                        {autoSimActive ? '⏹ Stop Auto Walk Simulator' : '▶ Start Auto Walk Simulator'}
-                      </button>
-                    </div>
-                  )}
+                    )}
 
-                  {activeSession.type === 'Stair Climbing' && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px', color: 'var(--color-exercise)' }} 
-                        onClick={handleSessionAddStairsUp}
-                      >
-                        🪜 Climb Up +1 Floor
-                      </button>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px', color: 'var(--color-stand)' }} 
-                        onClick={handleSessionAddStairsDown}
-                      >
-                        🪜 Descend -1 Floor
-                      </button>
-                    </div>
-                  )}
+                    {['Badminton', 'Tennis'].includes(activeSession.type) && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px' }} 
+                          onClick={() => handleSessionAddSwings(10)}
+                        >
+                          🏸 Swing +10
+                        </button>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px', color: 'var(--color-move)' }} 
+                          onClick={() => handleSessionAddSwings(1)}
+                        >
+                          💥 Play Shot +1
+                        </button>
+                      </div>
+                    )}
 
-                  {activeSession.type === 'Swimming' && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px' }} 
-                        onClick={() => handleSessionAddStrokes(10)}
-                      >
-                        🏊 Stroke +10
-                      </button>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px', color: 'var(--color-stand)' }} 
-                        onClick={handleSessionAddLap}
-                      >
-                        🏊 Complete Lap (50m)
-                      </button>
-                    </div>
-                  )}
+                    {activeSession.type === 'Cycling' && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px' }} 
+                          onClick={handleSessionAddPedals}
+                        >
+                          🚴 Pedal +500m
+                        </button>
+                      </div>
+                    )}
 
-                  {['Badminton', 'Tennis'].includes(activeSession.type) && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px' }} 
-                        onClick={() => handleSessionAddSwings(10)}
-                      >
-                        🏸 Swing +10
-                      </button>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px', color: 'var(--color-move)' }} 
-                        onClick={() => handleSessionAddSwings(1)}
-                      >
-                        💥 Play Shot +1
-                      </button>
-                    </div>
-                  )}
-
-                  {activeSession.type === 'Cycling' && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px' }} 
-                        onClick={handleSessionAddPedals}
-                      >
-                        🚴 Pedal +500m
-                      </button>
-                    </div>
-                  )}
-
-                  {activeSession.type === 'Yoga' && (
-                    <div style={{ display: 'flex', gap: '6px' }}>
-                      <button 
-                        className="sim-control-btn" 
-                        style={{ flex: 1, padding: '8px', color: '#bf5af2' }} 
-                        onClick={handleSessionAddBreaths}
-                      >
-                        🧘 Pose Breath +1
-                      </button>
-                    </div>
-                  )}
+                    {activeSession.type === 'Yoga' && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button 
+                          className="sim-control-btn" 
+                          style={{ flex: 1, padding: '8px', color: '#bf5af2' }} 
+                          onClick={handleSessionAddBreaths}
+                        >
+                          🧘 Pose Breath +1
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="session-controls">
                 {isPaused ? (
@@ -1748,6 +2231,111 @@ export default function App() {
                     </div>
                   </div>
 
+                  {/* Social Sharing & Competition Section */}
+                  <div className="glass-panel" style={{ padding: '16px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)' }}>SHARING & COMPETITION</span>
+                      <span style={{ fontSize: '11px', color: 'var(--color-exercise)', fontWeight: 'bold' }}>Live Leaderboard</span>
+                    </div>
+
+                    <div className="social-sharing-section">
+                      <div className="friends-list">
+                        {friends.map((friend, idx) => {
+                          const radOuter = 18;
+                          const radMid = 14;
+                          const radIn = 10;
+                          
+                          const dOuter = 2 * Math.PI * radOuter;
+                          const dMid = 2 * Math.PI * radMid;
+                          const dIn = 2 * Math.PI * radIn;
+                          
+                          // Convert activeRings to offsets
+                          const offOuter = dOuter - (Math.min(1, friend.activeRings?.move || 0.5) * dOuter);
+                          const offMid = dMid - (Math.min(1, friend.activeRings?.exercise || 0.4) * dMid);
+                          const offIn = dIn - (Math.min(1, friend.activeRings?.stand || 0.6) * dIn);
+
+                          const getFriendInitials = (name) => {
+                            const p = name.trim().split(/\s+/);
+                            if (p.length === 1) return p[0].substring(0, 2).toUpperCase();
+                            return (p[0][0] + p[p.length - 1][0]).toUpperCase();
+                          };
+
+                          return (
+                            <div key={idx} className="friend-row">
+                              <div className="friend-info-left">
+                                <div className="friend-avatar-ring">
+                                  <svg width="44" height="44" viewBox="0 0 44 44" style={{ transform: 'rotate(-90deg)' }}>
+                                    <circle cx="22" cy="22" r={radOuter} fill="transparent" stroke="rgba(255, 27, 85, 0.12)" strokeWidth="3" />
+                                    <circle cx="22" cy="22" r={radMid} fill="transparent" stroke="rgba(0, 249, 104, 0.12)" strokeWidth="3" />
+                                    <circle cx="22" cy="22" r={radIn} fill="transparent" stroke="rgba(0, 210, 255, 0.12)" strokeWidth="3" />
+                                    
+                                    <circle 
+                                      cx="22" cy="22" r={radOuter} fill="transparent" stroke="var(--color-move)" strokeWidth="3" 
+                                      strokeDasharray={dOuter} strokeDashoffset={offOuter} strokeLinecap="round" 
+                                    />
+                                    <circle 
+                                      cx="22" cy="22" r={radMid} fill="transparent" stroke="var(--color-exercise)" strokeWidth="3" 
+                                      strokeDasharray={dMid} strokeDashoffset={offMid} strokeLinecap="round" 
+                                    />
+                                    <circle 
+                                      cx="22" cy="22" r={radIn} fill="transparent" stroke="var(--color-stand)" strokeWidth="3" 
+                                      strokeDasharray={dIn} strokeDashoffset={offIn} strokeLinecap="round" 
+                                    />
+                                  </svg>
+                                  <span className="friend-avatar-initials">{getFriendInitials(friend.name)}</span>
+                                </div>
+
+                                <div className="friend-metrics">
+                                  <span className="friend-name">{friend.name}</span>
+                                  <span className="friend-subtext">
+                                    🏃 {friend.steps.toLocaleString()} steps • 🔥 {friend.calories} kcal
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="friend-actions">
+                                <button className="social-action-btn cheer" onClick={() => handleCheer(friend.name)}>
+                                  Cheer
+                                </button>
+                                <button className="social-action-btn nudge" onClick={() => handleNudge(friend.name)}>
+                                  Nudge
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Add Friend Row */}
+                      <form onSubmit={handleAddFriend} style={{ marginTop: '12px' }}>
+                        <span className="tool-label" style={{ display: 'block', marginBottom: '6px' }}>Invite a Friend</span>
+                        <div className="invite-friend-input-row">
+                          <input 
+                            type="text" 
+                            placeholder="Friend's Name" 
+                            className="tool-input"
+                            id="invite-friend-name"
+                            required
+                            style={{ flex: 1, padding: '8px 12px', fontSize: '12px' }}
+                          />
+                          <button 
+                            type="submit" 
+                            className="tool-btn" 
+                            style={{ 
+                              padding: '8px 16px', 
+                              fontSize: '12px', 
+                              marginTop: 0,
+                              background: 'var(--color-exercise-gradient)',
+                              color: '#000'
+                            }}
+                          >
+                            Send Invite
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
+
                   <button 
                     onClick={resetDailyProgress}
                     style={{
@@ -1795,6 +2383,248 @@ export default function App() {
                         <ChevronRight size={18} color="var(--text-muted)" />
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* SLEEP TAB */}
+              {activeTab === 'sleep' && (
+                <div className="fade-in" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <h2 style={{ fontSize: '20px', fontWeight: '800' }}>Sleep & Recovery</h2>
+                    <span style={{ fontSize: '12px', color: 'var(--color-sleep)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Moon size={14} fill="var(--color-sleep)" /> Nightly Quality
+                    </span>
+                  </div>
+
+                  {/* Sleep Ring and Score Summary */}
+                  {(() => {
+                    const latestLog = sleepLogs[0] || null;
+                    const hoursSlept = latestLog ? latestLog.duration : 0;
+                    const pctSleep = Math.min(1, hoursSlept / sleepGoal);
+                    const strokeDashSleep = 2 * Math.PI * 50; // radius = 50
+                    const offsetSleep = strokeDashSleep - (pctSleep * strokeDashSleep);
+                    
+                    let advice = "No logs yet. Log your sleep below to see insights.";
+                    if (latestLog) {
+                      if (latestLog.score >= 85) advice = "Excellent recovery! Your nervous system is primed for peak performance today.";
+                      else if (latestLog.score >= 70) advice = "Moderate recovery. Focus on light activity and healthy hydration.";
+                      else advice = "Low recovery. Prioritize rest, limit stressors, and try box breathing before sleep.";
+                    }
+
+                    return (
+                      <div className="glass-panel" style={{ padding: '16px' }}>
+                        <div className="sleep-ring-container">
+                          <div style={{ position: 'relative', width: '120px', height: '120px', transform: 'rotate(-90deg)' }}>
+                            <svg width="120" height="120" viewBox="0 0 120 120">
+                              <circle cx="60" cy="60" r="50" fill="transparent" stroke="rgba(94, 92, 230, 0.12)" strokeWidth="8" />
+                              <circle 
+                                cx="60" cy="60" r="50" 
+                                fill="transparent" 
+                                stroke="url(#sleepGrad)" 
+                                strokeWidth="8" 
+                                strokeDasharray={strokeDashSleep}
+                                strokeDashoffset={offsetSleep}
+                                strokeLinecap="round"
+                                style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+                              />
+                              <defs>
+                                <linearGradient id="sleepGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                                  <stop offset="0%" stopColor="#5e5ce6" />
+                                  <stop offset="100%" stopColor="#bf5af2" />
+                                </linearGradient>
+                              </defs>
+                            </svg>
+                            <div style={{
+                              position: 'absolute',
+                              top: '50%',
+                              left: '50%',
+                              transform: 'translate(-50%, -50%) rotate(90deg)',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              alignItems: 'center'
+                            }}>
+                              <Moon size={16} color="var(--color-sleep)" fill="var(--color-sleep)" />
+                              <span style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '2px' }}>
+                                {hoursSlept}h
+                              </span>
+                              <span style={{ fontSize: '8px', color: 'var(--text-secondary)' }}>
+                                of {sleepGoal}h
+                              </span>
+                            </div>
+                          </div>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', flex: 1, paddingLeft: '16px' }}>
+                            <div>
+                              <span style={{ fontSize: '10px', color: 'var(--text-secondary)', fontWeight: 'bold', textTransform: 'uppercase' }}>Sleep Quality Score</span>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: '4px' }}>
+                                <strong style={{ fontSize: '26px', color: 'var(--color-sleep)' }}>{latestLog ? latestLog.score : '--'}</strong>
+                                <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>/100</span>
+                              </div>
+                            </div>
+                            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                              {advice}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Sleep Stages Hypnogram Chart */}
+                  {sleepLogs.length > 0 && (
+                    <div className="glass-panel hypnogram-container" style={{ padding: '16px' }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', display: 'block', marginBottom: '4px', textAlign: 'left' }}>
+                        Sleep Stages Breakdown
+                      </span>
+                      <span style={{ fontSize: '9px', color: 'var(--text-secondary)', textTransform: 'uppercase', fontWeight: 'bold', display: 'block', marginBottom: '12px', textAlign: 'left' }}>
+                        Duration in Awake, REM, Core, and Deep cycles
+                      </span>
+                      
+                      {(() => {
+                        const stages = sleepLogs[0].stages;
+                        const duration = sleepLogs[0].duration || 8;
+                        const awakePct = (stages.awake / duration) * 100;
+                        const remPct = (stages.rem / duration) * 100;
+                        const corePct = (stages.core / duration) * 100;
+                        const deepPct = (stages.deep / duration) * 100;
+
+                        return (
+                          <>
+                            <div className="hypnogram-chart">
+                              <div className="hypnogram-stage-row">
+                                <span className="hypnogram-label">Awake</span>
+                                <div className="hypnogram-bar-track">
+                                  <div className="hypnogram-bar-fill" style={{ width: `${awakePct}%`, backgroundColor: 'var(--color-sleep-awake)' }}></div>
+                                </div>
+                                <span style={{ fontSize: '11px', fontWeight: 'bold', width: '36px', textAlign: 'left' }}>{stages.awake}h</span>
+                              </div>
+                              <div className="hypnogram-stage-row">
+                                <span className="hypnogram-label">REM</span>
+                                <div className="hypnogram-bar-track">
+                                  <div className="hypnogram-bar-fill" style={{ width: `${remPct}%`, backgroundColor: 'var(--color-sleep-rem)' }}></div>
+                                </div>
+                                <span style={{ fontSize: '11px', fontWeight: 'bold', width: '36px', textAlign: 'left' }}>{stages.rem}h</span>
+                              </div>
+                              <div className="hypnogram-stage-row">
+                                <span className="hypnogram-label">Core</span>
+                                <div className="hypnogram-bar-track">
+                                  <div className="hypnogram-bar-fill" style={{ width: `${corePct}%`, backgroundColor: 'var(--color-sleep-core)' }}></div>
+                                </div>
+                                <span style={{ fontSize: '11px', fontWeight: 'bold', width: '36px', textAlign: 'left' }}>{stages.core}h</span>
+                              </div>
+                              <div className="hypnogram-stage-row">
+                                <span className="hypnogram-label">Deep</span>
+                                <div className="hypnogram-bar-track">
+                                  <div className="hypnogram-bar-fill" style={{ width: `${deepPct}%`, backgroundColor: 'var(--color-sleep-deep)' }}></div>
+                                </div>
+                                <span style={{ fontSize: '11px', fontWeight: 'bold', width: '36px', textAlign: 'left' }}>{stages.deep}h</span>
+                              </div>
+                            </div>
+
+                            <div className="hypnogram-legend">
+                              <div className="legend-item">
+                                <span className="legend-dot" style={{ backgroundColor: 'var(--color-sleep-awake)' }}></span>
+                                <span>Awake (Arousal)</span>
+                              </div>
+                              <div className="legend-item">
+                                <span className="legend-dot" style={{ backgroundColor: 'var(--color-sleep-rem)' }}></span>
+                                <span>REM (Dreaming)</span>
+                              </div>
+                              <div className="legend-item">
+                                <span className="legend-dot" style={{ backgroundColor: 'var(--color-sleep-core)' }}></span>
+                                <span>Core (Light)</span>
+                              </div>
+                              <div className="legend-item">
+                                <span className="legend-dot" style={{ backgroundColor: 'var(--color-sleep-deep)' }}></span>
+                                <span>Deep (Restore)</span>
+                              </div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Sleep Log Form Widget */}
+                  <div className="glass-panel" style={{ padding: '20px' }}>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: 'var(--text-primary)', display: 'block', marginBottom: '16px', textAlign: 'left' }}>
+                      Log Sleep Session
+                    </span>
+                    <form className="sleep-form" onSubmit={logSleepSession}>
+                      <div className="sleep-form-col">
+                        <span className="tool-label">Bedtime</span>
+                        <input 
+                          type="time" 
+                          required 
+                          className="tool-input"
+                          value={sleepInput.bedTime}
+                          onChange={e => setSleepInput({ ...sleepInput, bedTime: e.target.value })}
+                        />
+                      </div>
+                      <div className="sleep-form-col">
+                        <span className="tool-label">Wake Time</span>
+                        <input 
+                          type="time" 
+                          required 
+                          className="tool-input"
+                          value={sleepInput.wakeTime}
+                          onChange={e => setSleepInput({ ...sleepInput, wakeTime: e.target.value })}
+                        />
+                      </div>
+                      <div className="sleep-form-col-span-2">
+                        <span className="tool-label">Sleep Quality Feel</span>
+                        <select 
+                          className="tool-input"
+                          value={sleepInput.quality}
+                          onChange={e => setSleepInput({ ...sleepInput, quality: e.target.value })}
+                          style={{ background: '#1c1c1e', color: '#fff' }}
+                        >
+                          <option value="excellent">😃 Refreshed / Excellent</option>
+                          <option value="good">😊 Well Rested / Good</option>
+                          <option value="fair">😐 Tired / Fair</option>
+                          <option value="poor">🥱 Exhausted / Poor</option>
+                        </select>
+                      </div>
+                      <div className="sleep-form-col-span-2">
+                        <span className="tool-label">Sleep Target Goal (Hours)</span>
+                        <input 
+                          type="number" 
+                          step="0.5"
+                          min="4"
+                          max="12"
+                          className="tool-input"
+                          value={sleepGoal}
+                          onChange={e => setSleepGoal(parseFloat(e.target.value) || 8.0)}
+                        />
+                      </div>
+                      <button type="submit" className="tool-btn" style={{ gridColumn: 'span 2', background: 'var(--color-sleep-gradient)', color: '#fff', fontSize: '13px' }}>
+                        Save Log Entry
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Historical Sleep Logs */}
+                  <div className="glass-panel" style={{ padding: '16px', textAlign: 'left' }}>
+                    <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-secondary)', display: 'block', marginBottom: '12px' }}>
+                      SLEEP LOG HISTORY
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {sleepLogs.slice(0, 5).map((log) => (
+                        <div key={log.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-light)' }}>
+                          <div>
+                            <strong style={{ fontSize: '13px' }}>{log.date} Sleep</strong>
+                            <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-secondary)' }}>
+                              {log.bedTime} to {log.wakeTime} ({log.quality})
+                            </span>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <strong style={{ color: 'var(--color-sleep)', fontSize: '14px' }}>{log.duration} hrs</strong>
+                            <span style={{ display: 'block', fontSize: '10px', color: 'var(--text-secondary)' }}>Score: {log.score}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -2064,6 +2894,14 @@ export default function App() {
               >
                 <Trophy size={20} />
                 <span>Fitness Tools</span>
+              </button>
+              <button 
+                className={`nav-tab ${activeTab === 'sleep' ? 'active' : ''}`}
+                onClick={() => setActiveTab('sleep')}
+                style={{ color: activeTab === 'sleep' ? 'var(--color-sleep)' : '' }}
+              >
+                <Moon size={20} />
+                <span>Sleep</span>
               </button>
               <button 
                 className={`nav-tab ${activeTab === 'tools' ? 'active' : ''}`}
@@ -2336,6 +3174,16 @@ export default function App() {
               </div>
             </div>
           )}
+
+          {/* App Toast Notifications */}
+          <div className="fitness-toast-container">
+            {toasts.map(toast => (
+              <div key={toast.id} className="fitness-toast">
+                <span>{toast.icon}</span>
+                <span>{toast.message}</span>
+              </div>
+            ))}
+          </div>
 
         </div>
       );
