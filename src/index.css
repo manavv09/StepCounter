@@ -1314,4 +1314,456 @@ body {
   }
 }
 
+/* ==========================================
+   SLEEP & RECOVERY TRACKER STYLES
+   ========================================== */
+:root {
+  --color-sleep: #5e5ce6;
+  --color-sleep-light: rgba(94, 92, 230, 0.2);
+  --color-sleep-gradient: linear-gradient(135deg, #5e5ce6, #bf5af2);
+  --color-sleep-deep: #3634a3;
+  --color-sleep-core: #0a84ff;
+  --color-sleep-rem: #64d2ff;
+  --color-sleep-awake: #ff9f0a;
+}
+
+.sleep-ring-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 16px;
+}
+
+.sleep-score-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(94, 92, 230, 0.1);
+  border: 1px solid rgba(94, 92, 230, 0.2);
+  border-radius: 12px;
+  padding: 12px;
+  width: 100%;
+  max-width: 120px;
+}
+
+/* Sleep Hypnogram (Stages chart) */
+.hypnogram-container {
+  margin-top: 16px;
+}
+
+.hypnogram-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+}
+
+.hypnogram-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.hypnogram-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 50px;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.hypnogram-bar-track {
+  flex: 1;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 7px;
+  position: relative;
+  overflow: hidden;
+}
+
+.hypnogram-bar-fill {
+  height: 100%;
+  border-radius: 7px;
+  transition: width 0.8s ease-out;
+}
+
+.hypnogram-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 12px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+/* Sleep logging form input */
+.sleep-form {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  text-align: left;
+}
+
+.sleep-form-col {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sleep-form-col-span-2 {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ==========================================
+   MINDFULNESS & STATE OF MIND STYLES
+   ========================================== */
+/* Breathing Coach Animations */
+.breathing-bubble-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 250px;
+  position: relative;
+  margin: 20px 0;
+}
+
+.breathing-bubble {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 210, 255, 0.6) 0%, rgba(94, 92, 230, 0.4) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  box-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
+  transition: transform 4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.breathing-bubble.inhale {
+  transform: scale(1.5);
+  box-shadow: 0 0 60px rgba(0, 210, 255, 0.7), 0 0 100px rgba(94, 92, 230, 0.5);
+  background: radial-gradient(circle, rgba(0, 210, 255, 0.8) 0%, rgba(94, 92, 230, 0.6) 100%);
+}
+
+.breathing-bubble.hold-in {
+  transform: scale(1.5);
+  box-shadow: 0 0 80px rgba(0, 210, 255, 0.9), 0 0 130px rgba(94, 92, 230, 0.7);
+}
+
+.breathing-bubble.exhale {
+  transform: scale(0.9);
+  box-shadow: 0 0 15px rgba(0, 210, 255, 0.2);
+}
+
+.breathing-bubble.hold-out {
+  transform: scale(0.9);
+  box-shadow: 0 0 10px rgba(0, 210, 255, 0.1);
+}
+
+.breathing-cycle-indicator {
+  margin-top: 24px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Reflection Aura Backgrounds */
+.reflection-aura-panel {
+  width: 100%;
+  max-width: 450px;
+  padding: 24px;
+  border-radius: 20px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reflection-aura-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  filter: blur(50px);
+  z-index: 1;
+  transition: background 1.5s ease;
+  opacity: 0.65;
+}
+
+.reflection-aura-glow.very-pleasant { background: radial-gradient(circle, #ffcc00, #ff9500); }
+.reflection-aura-glow.pleasant { background: radial-gradient(circle, #34c759, #30b0c7); }
+.reflection-aura-glow.neutral { background: radial-gradient(circle, #8e8e93, #636366); }
+.reflection-aura-glow.unpleasant { background: radial-gradient(circle, #5856d6, #af52de); }
+.reflection-aura-glow.very-unpleasant { background: radial-gradient(circle, #ff3b30, #ff2d55); }
+
+.reflection-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mood-selector {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.mood-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 4px;
+  border-radius: 12px;
+  background: rgba(28, 28, 30, 0.6);
+  border: 1px solid var(--border-light);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.mood-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.mood-btn.active {
+  border-color: #fff;
+  transform: scale(1.08);
+  box-shadow: 0 4px 15px rgba(255,255,255,0.15);
+}
+
+.mood-emoji {
+  font-size: 24px;
+}
+
+.mood-text {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.mood-btn.active .mood-text {
+  color: #fff;
+}
+
+.feeling-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.feeling-tag-btn {
+  background: rgba(28, 28, 30, 0.7);
+  border: 1px solid var(--border-light);
+  color: var(--text-secondary);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feeling-tag-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.feeling-tag-btn.active {
+  background: #fff;
+  color: #000;
+  border-color: #fff;
+}
+
+/* ==========================================
+   SOCIAL SHARING & LEADERBOARD STYLES
+   ========================================== */
+.social-sharing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.friends-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.friend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: rgba(28, 28, 30, 0.5);
+  border-radius: 14px;
+  border: 1px solid var(--border-light);
+  transition: all 0.2s;
+}
+
+.friend-row:hover {
+  border-color: var(--border-active);
+  background: rgba(44, 44, 46, 0.6);
+}
+
+.friend-info-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.friend-avatar-ring {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.friend-avatar-initials {
+  position: absolute;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.friend-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.friend-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.friend-subtext {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.friend-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.social-action-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.social-action-btn.cheer {
+  background: rgba(48, 209, 88, 0.15);
+  color: #30d158;
+}
+
+.social-action-btn.cheer:hover {
+  background: rgba(48, 209, 88, 0.25);
+}
+
+.social-action-btn.nudge {
+  background: rgba(255, 159, 10, 0.15);
+  color: #ff9f0a;
+}
+
+.social-action-btn.nudge:hover {
+  background: rgba(255, 159, 10, 0.25);
+}
+
+/* Share modal or add friend drawer */
+.invite-friend-input-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Toast Notifications */
+.fitness-toast-container {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: calc(100% - 40px);
+  max-width: 380px;
+  pointer-events: none;
+}
+
+.fitness-toast {
+  background: rgba(28, 28, 30, 0.95);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 12px 16px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  pointer-events: auto;
+  animation: slideInDown 0.3s cubic-bezier(0.16, 1, 0.3, 1), fadeOut 0.3s 2.7s forwards;
+}
+
+@keyframes slideInDown {
+  from { transform: translateY(-40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
 
